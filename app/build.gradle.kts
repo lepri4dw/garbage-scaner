@@ -66,11 +66,16 @@ dependencies {
     // Retrofit для работы с API
     implementation("com.google.code.gson:gson:2.10.1")
 
+    implementation ("com.android.volley:volley:1.2.1")
+
+
     val camerax_version = ("1.2.3")
     implementation ("androidx.camera:camera-core:$camerax_version")
     implementation ("androidx.camera:camera-camera2:$camerax_version")
     implementation ("androidx.camera:camera-lifecycle:$camerax_version")
     implementation ("androidx.camera:camera-view:$camerax_version")
+
+
 
     // Google Cloud Vision API
     implementation("com.google.cloud:google-cloud-vision:3.7.0")

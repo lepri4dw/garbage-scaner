@@ -18,7 +18,7 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
-import com.example.garbagescaner.R; 
+import com.example.garbagescaner.R;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -68,6 +68,13 @@ public class MapActivity extends AppCompatActivity {
 
         // Загрузка начальной карты Бишкека
         loadInitialMap();
+
+        // Проверяем, был ли передан тип отхода
+        String wasteType = getIntent().getStringExtra("waste_type");
+        if (wasteType != null && !wasteType.isEmpty()) {
+            // Выбираем соответствующий тип материала в спиннере
+            selectMaterialByWasteType(wasteType);
+        }
     }
 
     private void setupSpinner() {
@@ -98,6 +105,30 @@ public class MapActivity extends AppCompatActivity {
                 // Ничего не делаем
             }
         });
+    }
+
+    // Новый метод для выбора материала на основе типа отхода
+    private void selectMaterialByWasteType(String wasteType) {
+        // Приводим к нижнему регистру для упрощения сравнения
+        String lowerCaseType = wasteType.toLowerCase();
+
+        int position = 0; // По умолчанию "Выберите материал"
+
+        if (lowerCaseType.contains("пластик") || lowerCaseType.contains("пэт")) {
+            position = 1; // Пластик
+        } else if (lowerCaseType.contains("стекл")) {
+            position = 2; // Стекло
+        } else if (lowerCaseType.contains("бумаг") || lowerCaseType.contains("картон")) {
+            position = 3; // Бумага
+        } else if (lowerCaseType.contains("метал")) {
+            position = 4; // Металл
+        } else if (lowerCaseType.contains("электро") || lowerCaseType.contains("техни")) {
+            position = 5; // Электроника
+        }
+
+        if (position > 0) {
+            materialSpinner.setSelection(position);
+        }
     }
 
     private void loadInitialMap() {
