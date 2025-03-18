@@ -60,6 +60,12 @@ dependencies {
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
 
+    val camerax_version = ("1.2.3")
+    implementation ("androidx.camera:camera-core:$camerax_version")
+    implementation ("androidx.camera:camera-camera2:$camerax_version")
+    implementation ("androidx.camera:camera-lifecycle:$camerax_version")
+    implementation ("androidx.camera:camera-view:$camerax_version")
+
     // Google Cloud Vision API
     implementation("com.google.cloud:google-cloud-vision:3.7.0")
     implementation("com.google.api:gax-grpc:2.22.0")
@@ -73,6 +79,8 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
+    implementation ("com.squareup.retrofit2:converter-scalars:2.9.0")
+
 
     // Glide для работы с изображениями
     implementation("com.github.bumptech.glide:glide:4.15.1")

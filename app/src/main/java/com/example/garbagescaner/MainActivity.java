@@ -3,6 +3,7 @@ package com.example.garbagescaner;
 import android.Manifest;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -36,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
 
     private ImageView imageView;
     private Button btnSelectImage;
+    private Button btnScanWithCamera; // Новая кнопка для сканирования камерой
     private TextView tvLoading;
     private CardView cardResult;
     private TextView tvGarbageType;
@@ -45,7 +47,9 @@ public class MainActivity extends AppCompatActivity {
     private VisionApiClient visionApiClient;
     private GeminiApiClient geminiApiClient;
 
+    // Лаунчеры для выбора изображения и сканирования камерой
     private ActivityResultLauncher<Intent> imagePickerLauncher;
+    private ActivityResultLauncher<Intent> cameraLauncher;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,13 +58,14 @@ public class MainActivity extends AppCompatActivity {
 
         initializeViews();
         initializeClients();
-        setupImagePicker();
+        setupLaunchers();
         setupListeners();
     }
 
     private void initializeViews() {
         imageView = findViewById(R.id.imageView);
         btnSelectImage = findViewById(R.id.btnSelectImage);
+        btnScanWithCamera = findViewById(R.id.btnScanWithCamera); // Инициализация новой кнопки
         tvLoading = findViewById(R.id.tvLoading);
         cardResult = findViewById(R.id.cardResult);
         tvGarbageType = findViewById(R.id.tvGarbageType);
@@ -73,7 +78,8 @@ public class MainActivity extends AppCompatActivity {
         geminiApiClient = new GeminiApiClient(GEMINI_API_KEY);
     }
 
-    private void setupImagePicker() {
+    private void setupLaunchers() {
+        // Настройка лаунчера для выбора изображения из галереи
         imagePickerLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -91,10 +97,30 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
         );
+
+        // Настройка лаунчера для получения изображения с камеры
+        cameraLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                        String imagePath = result.getData().getStringExtra("image_path");
+                        if (imagePath != null) {
+                            try {
+                                Bitmap bitmap = BitmapFactory.decodeFile(imagePath);
+                                displayImage(bitmap);
+                                processImage(bitmap);
+                            } catch (Exception e) {
+                                Toast.makeText(this, "Ошибка загрузки изображения: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    }
+                }
+        );
     }
 
     private void setupListeners() {
         btnSelectImage.setOnClickListener(v -> checkPermissionAndPickImage());
+        btnScanWithCamera.setOnClickListener(v -> openCameraScanner()); // Добавление обработчика для новой кнопки
     }
 
     private void checkPermissionAndPickImage() {
@@ -129,6 +155,12 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(Intent.ACTION_PICK);
         intent.setType("image/*");
         imagePickerLauncher.launch(intent);
+    }
+
+    // Новый метод для запуска активности сканера
+    private void openCameraScanner() {
+        Intent intent = new Intent(this, CameraActivity.class);
+        cameraLauncher.launch(intent);
     }
 
     private void displayImage(Bitmap bitmap) {
@@ -181,6 +213,7 @@ public class MainActivity extends AppCompatActivity {
     private void showLoading(boolean isLoading) {
         tvLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
         btnSelectImage.setEnabled(!isLoading);
+        btnScanWithCamera.setEnabled(!isLoading); // Добавлено отключение кнопки сканера во время загрузки
     }
 
     private void hideResult() {
