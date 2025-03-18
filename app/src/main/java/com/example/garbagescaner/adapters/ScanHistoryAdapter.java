@@ -4,10 +4,12 @@ import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
@@ -24,6 +26,7 @@ public class ScanHistoryAdapter extends RecyclerView.Adapter<ScanHistoryAdapter.
 
     public interface OnHistoryItemClickListener {
         void onItemClick(ScanResult scanResult);
+        void onRecycleClick(ScanResult scanResult, int position);
     }
 
     public ScanHistoryAdapter(Context context, List<ScanResult> scanResults, OnHistoryItemClickListener listener) {
@@ -47,6 +50,20 @@ public class ScanHistoryAdapter extends RecyclerView.Adapter<ScanHistoryAdapter.
         holder.tvWasteType.setText(scanResult.getWasteType());
         holder.tvEstimatedCost.setText(scanResult.getEstimatedCost());
 
+        // Устанавливаем статус утилизации
+        if (scanResult.isRecycled()) {
+            holder.btnRecycle.setVisibility(View.GONE);
+            holder.tvStatus.setVisibility(View.VISIBLE);
+            holder.tvStatus.setText("Утилизировано: " + scanResult.getFormattedRecycledDate());
+            holder.tvStatus.setTextColor(ContextCompat.getColor(context, R.color.green_primary));
+            // Добавляем затемнение для утилизированных элементов
+            holder.itemView.setAlpha(0.7f);
+        } else {
+            holder.btnRecycle.setVisibility(View.VISIBLE);
+            holder.tvStatus.setVisibility(View.GONE);
+            holder.itemView.setAlpha(1.0f);
+        }
+
         // Загрузка изображения с помощью Glide
         if (scanResult.getImage() != null) {
             Glide.with(context)
@@ -57,10 +74,17 @@ public class ScanHistoryAdapter extends RecyclerView.Adapter<ScanHistoryAdapter.
             holder.imageView.setImageResource(R.drawable.ic_scanner);
         }
 
-        // Устанавливаем слушатель кликов
+        // Устанавливаем слушатель клика по элементу
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onItemClick(scanResult);
+            }
+        });
+
+        // Устанавливаем слушатель для кнопки утилизации
+        holder.btnRecycle.setOnClickListener(v -> {
+            if (listener != null) {
+                listener.onRecycleClick(scanResult, holder.getAdapterPosition());
             }
         });
     }
@@ -75,6 +99,8 @@ public class ScanHistoryAdapter extends RecyclerView.Adapter<ScanHistoryAdapter.
         TextView tvDate;
         TextView tvWasteType;
         TextView tvEstimatedCost;
+        TextView tvStatus;
+        Button btnRecycle;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -82,6 +108,8 @@ public class ScanHistoryAdapter extends RecyclerView.Adapter<ScanHistoryAdapter.
             tvDate = itemView.findViewById(R.id.tvScanDate);
             tvWasteType = itemView.findViewById(R.id.tvWasteType);
             tvEstimatedCost = itemView.findViewById(R.id.tvEstimatedCost);
+            tvStatus = itemView.findViewById(R.id.tvStatus);
+            btnRecycle = itemView.findViewById(R.id.btnRecycle);
         }
     }
 }

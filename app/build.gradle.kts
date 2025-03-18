@@ -81,6 +81,8 @@ dependencies {
     implementation("com.google.cloud:google-cloud-vision:3.7.0")
     implementation("com.google.api:gax-grpc:2.22.0")
 
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+
     implementation("io.grpc:grpc-okhttp:1.53.0")
     implementation("io.grpc:grpc-android:1.53.0")
     implementation("io.grpc:grpc-protobuf:1.53.0")

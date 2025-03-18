@@ -8,6 +8,7 @@ import android.util.Base64;
 import android.util.Log;
 
 import com.example.garbagescaner.models.ScanResult;
+import com.example.garbagescaner.models.StatisticPeriod;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonDeserializationContext;
@@ -22,9 +23,11 @@ import com.google.gson.reflect.TypeToken;
 import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
-import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ScanHistoryManager {
     private static final String TAG = "ScanHistoryManager";
@@ -34,8 +37,11 @@ public class ScanHistoryManager {
 
     private final SharedPreferences preferences;
     private final Gson gson;
+    private final Context context;
+    private final AchievementManager achievementManager;
 
     public ScanHistoryManager(Context context) {
+        this.context = context;
         preferences = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
 
         // Настраиваем Gson для сериализации/десериализации изображений в формате Base64
@@ -43,6 +49,9 @@ public class ScanHistoryManager {
         gsonBuilder.registerTypeAdapter(Bitmap.class, new BitmapSerializer());
         gsonBuilder.registerTypeAdapter(Bitmap.class, new BitmapDeserializer());
         gson = gsonBuilder.create();
+
+        // Инициализируем менеджер достижений
+        achievementManager = new AchievementManager(context);
     }
 
     public List<ScanResult> getAllScanResults() {
@@ -82,6 +91,29 @@ public class ScanHistoryManager {
 
         // Сохраняем обновленную историю
         saveHistory(history);
+
+        // Проверяем достижения
+        achievementManager.checkAndUnlockAchievements(history);
+    }
+
+    // Метод для обновления результата сканирования (маркировка как утилизированного)
+    public void markAsRecycled(int position) {
+        List<ScanResult> history = getAllScanResults();
+
+        if (position >= 0 && position < history.size()) {
+            // Получаем элемент и маркируем его как утилизированный
+            ScanResult result = history.get(position);
+            if (!result.isRecycled()) {
+                result.markAsRecycled();
+
+                // Сохраняем обновленную историю
+                saveHistory(history);
+                saveHistory(history);
+
+                // Проверяем достижения
+                achievementManager.checkAndUnlockAchievements(history);
+            }
+        }
     }
 
     private void saveHistory(List<ScanResult> history) {
@@ -95,6 +127,110 @@ public class ScanHistoryManager {
 
     public void clearHistory() {
         preferences.edit().remove(KEY_HISTORY).apply();
+    }
+
+    // Получение статистики по утилизированным отходам
+    public Map<String, Double> getRecyclingStatistics(StatisticPeriod period) {
+        List<ScanResult> history = getAllScanResults();
+        Map<String, Double> statistics = new HashMap<>();
+
+        // Инициализируем каждый тип отхода нулем
+        statistics.put("Пластик", 0.0);
+        statistics.put("Стекло", 0.0);
+        statistics.put("Бумага", 0.0);
+        statistics.put("Металл", 0.0);
+        statistics.put("Электроника", 0.0);
+        statistics.put("Пищевые отходы", 0.0);
+        statistics.put("Прочее", 0.0);
+
+        // Получаем временную метку начала периода
+        long periodStartTime = getPeriodStartTimestamp(period);
+
+        for (ScanResult result : history) {
+            // Учитываем только утилизированные отходы в заданном периоде
+            if (result.isRecycled() && result.getRecycledTimestamp() >= periodStartTime) {
+                String wasteType = result.getWasteType();
+                double cost = result.getNumericCost();
+
+                // Определяем категорию отхода
+                String category = "Прочее";
+                if (wasteType.contains("Пластик")) {
+                    category = "Пластик";
+                } else if (wasteType.contains("Стекло")) {
+                    category = "Стекло";
+                } else if (wasteType.contains("Бумага")) {
+                    category = "Бумага";
+                } else if (wasteType.contains("Металл")) {
+                    category = "Металл";
+                } else if (wasteType.contains("Электроника")) {
+                    category = "Электроника";
+                } else if (wasteType.contains("Пищевые")) {
+                    category = "Пищевые отходы";
+                }
+
+                // Добавляем стоимость к соответствующей категории
+                statistics.put(category, statistics.get(category) + cost);
+            }
+        }
+
+        return statistics;
+    }
+
+    // Получение общего количества утилизированных отходов по периодам
+    public int getTotalRecycledCount(StatisticPeriod period) {
+        List<ScanResult> history = getAllScanResults();
+        int count = 0;
+
+        // Получаем временную метку начала периода
+        long periodStartTime = getPeriodStartTimestamp(period);
+
+        for (ScanResult result : history) {
+            if (result.isRecycled() && result.getRecycledTimestamp() >= periodStartTime) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    // Рассчет временной метки начала периода
+    private long getPeriodStartTimestamp(StatisticPeriod period) {
+        Calendar calendar = Calendar.getInstance();
+
+        switch (period) {
+            case TODAY:
+                // Начало текущего дня
+                calendar.set(Calendar.HOUR_OF_DAY, 0);
+                calendar.set(Calendar.MINUTE, 0);
+                calendar.set(Calendar.SECOND, 0);
+                calendar.set(Calendar.MILLISECOND, 0);
+                break;
+
+            case WEEK:
+                // Начало текущей недели (понедельник)
+                calendar.set(Calendar.HOUR_OF_DAY, 0);
+                calendar.set(Calendar.MINUTE, 0);
+                calendar.set(Calendar.SECOND, 0);
+                calendar.set(Calendar.MILLISECOND, 0);
+                calendar.set(Calendar.DAY_OF_WEEK, calendar.getFirstDayOfWeek());
+                break;
+
+            case MONTH:
+                // Начало текущего месяца
+                calendar.set(Calendar.DAY_OF_MONTH, 1);
+                calendar.set(Calendar.HOUR_OF_DAY, 0);
+                calendar.set(Calendar.MINUTE, 0);
+                calendar.set(Calendar.SECOND, 0);
+                calendar.set(Calendar.MILLISECOND, 0);
+                break;
+
+            case ALL_TIME:
+            default:
+                // Все время - возвращаем 0
+                return 0;
+        }
+
+        return calendar.getTimeInMillis();
     }
 
     /**

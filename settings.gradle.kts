@@ -17,6 +17,8 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         maven ("https://artifactory.2gis.dev/sdk-maven-release" )
+        maven("https://jitpack.io")
+
 
     }
 }
