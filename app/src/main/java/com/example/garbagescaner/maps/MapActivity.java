@@ -46,6 +46,8 @@ public class MapActivity extends AppCompatActivity {
     private static final String PAPER_QUERY = "пункт приема макулатуры";
     private static final String METAL_QUERY = "пункт приема металла";
     private static final String ELECTRONICS_QUERY = "пункт приема электроники";
+    private static final String FOOD_QUERY = "компостирование пищевых отходов";
+    private static final String OTHER_QUERY = "пункт приема вторсырья";
 
     private RequestQueue requestQueue;
 
@@ -85,6 +87,8 @@ public class MapActivity extends AppCompatActivity {
         materials.add("Бумага");
         materials.add("Металл");
         materials.add("Электроника");
+        materials.add("Пищевые отходы");
+        materials.add("Прочее");
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                 this, android.R.layout.simple_spinner_item, materials);
@@ -94,41 +98,50 @@ public class MapActivity extends AppCompatActivity {
         materialSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (position > 0) { // Игнорируем первый элемент "Выберите материал"
-                    String selectedMaterial = (String) parent.getItemAtPosition(position);
+                // Всегда вызываем поиск, даже для первого элемента
+                String selectedMaterial = (String) parent.getItemAtPosition(position);
+                if (position == 0) { // Если выбрано "Выберите материал"
+                    // Показываем общие пункты приема вторсырья
+                    searchRecyclingPoints("Прочее");
+                } else {
                     searchRecyclingPoints(selectedMaterial);
                 }
             }
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
-                // Ничего не делаем
+                // Показываем общие пункты приема вторсырья
+                searchRecyclingPoints("Прочее");
             }
         });
     }
 
-    // Новый метод для выбора материала на основе типа отхода
+    // Метод для выбора материала на основе типа отхода
     private void selectMaterialByWasteType(String wasteType) {
         // Приводим к нижнему регистру для упрощения сравнения
         String lowerCaseType = wasteType.toLowerCase();
 
         int position = 0; // По умолчанию "Выберите материал"
 
-        if (lowerCaseType.contains("пластик") || lowerCaseType.contains("пэт")) {
+        if (lowerCaseType.equals("пластик")) {
             position = 1; // Пластик
-        } else if (lowerCaseType.contains("стекл")) {
+        } else if (lowerCaseType.equals("стекло")) {
             position = 2; // Стекло
-        } else if (lowerCaseType.contains("бумаг") || lowerCaseType.contains("картон")) {
+        } else if (lowerCaseType.equals("бумага")) {
             position = 3; // Бумага
-        } else if (lowerCaseType.contains("метал")) {
+        } else if (lowerCaseType.equals("металл")) {
             position = 4; // Металл
-        } else if (lowerCaseType.contains("электро") || lowerCaseType.contains("техни")) {
+        } else if (lowerCaseType.equals("электроника")) {
             position = 5; // Электроника
+        } else if (lowerCaseType.equals("пищевые отходы")) {
+            position = 6; // Пищевые отходы
+        } else if (lowerCaseType.equals("прочее")) {
+            position = 7; // Прочее
         }
 
-        if (position > 0) {
-            materialSpinner.setSelection(position);
-        }
+        materialSpinner.setSelection(position);
+        // При нулевой позиции (Выберите материал) мы все равно
+        // будем показывать пункты "Прочее", благодаря изменениям в onItemSelected
     }
 
     private void loadInitialMap() {
@@ -157,8 +170,14 @@ public class MapActivity extends AppCompatActivity {
             case "Электроника":
                 query = ELECTRONICS_QUERY;
                 break;
+            case "Пищевые отходы":
+                query = FOOD_QUERY;
+                break;
+            case "Прочее":
+                query = OTHER_QUERY;
+                break;
             default:
-                query = "пункт приема";
+                query = OTHER_QUERY;
                 break;
         }
 
@@ -177,11 +196,24 @@ public class MapActivity extends AppCompatActivity {
                         public void onResponse(String response) {
                             try {
                                 List<RecyclingPoint> points = parseResponse(response);
-                                updateMap(points);
+                                if (points.isEmpty()) {
+                                    // Если не найдено точек, пробуем поиск по общему запросу
+                                    if (!query.equals(OTHER_QUERY)) {
+                                        Log.d(TAG, "Точки не найдены, пробуем поиск по 'пункт приема вторсырья'");
+                                        searchWithFallbackQuery();
+                                    } else {
+                                        Toast.makeText(MapActivity.this,
+                                                "Пункты приема не найдены", Toast.LENGTH_SHORT).show();
+                                        updateMap(new ArrayList<>());
+                                    }
+                                } else {
+                                    updateMap(points);
+                                }
                             } catch (JSONException e) {
                                 Log.e(TAG, "JSON parsing error: " + e.getMessage());
                                 Toast.makeText(MapActivity.this,
                                         "Ошибка обработки данных", Toast.LENGTH_SHORT).show();
+                                searchWithFallbackQuery();
                             }
                         }
                     },
@@ -191,6 +223,7 @@ public class MapActivity extends AppCompatActivity {
                             Log.e(TAG, "API Error: " + error.toString());
                             Toast.makeText(MapActivity.this,
                                     "Ошибка получения данных", Toast.LENGTH_SHORT).show();
+                            searchWithFallbackQuery();
                         }
                     });
 
@@ -198,6 +231,54 @@ public class MapActivity extends AppCompatActivity {
 
         } catch (UnsupportedEncodingException e) {
             Log.e(TAG, "URL encoding error: " + e.getMessage());
+            searchWithFallbackQuery();
+        }
+    }
+
+    // Метод для поиска с использованием запасного запроса
+    private void searchWithFallbackQuery() {
+        try {
+            String encodedQuery = URLEncoder.encode(OTHER_QUERY, "UTF-8");
+            String url = BASE_URL + "?q=" + encodedQuery +
+                    "&location=" + BISHKEK_LON + "," + BISHKEK_LAT +
+                    "&radius=15000&fields=items.point&key=" + API_KEY;
+
+            Log.d(TAG, "Fallback API URL: " + url);
+
+            StringRequest stringRequest = new StringRequest(Request.Method.GET, url,
+                    new Response.Listener<String>() {
+                        @Override
+                        public void onResponse(String response) {
+                            try {
+                                List<RecyclingPoint> points = parseResponse(response);
+                                updateMap(points);
+                                if (points.isEmpty()) {
+                                    Toast.makeText(MapActivity.this,
+                                            "Пункты приема не найдены", Toast.LENGTH_SHORT).show();
+                                }
+                            } catch (JSONException e) {
+                                Log.e(TAG, "Fallback JSON parsing error: " + e.getMessage());
+                                Toast.makeText(MapActivity.this,
+                                        "Ошибка обработки данных", Toast.LENGTH_SHORT).show();
+                                updateMap(new ArrayList<>());
+                            }
+                        }
+                    },
+                    new Response.ErrorListener() {
+                        @Override
+                        public void onErrorResponse(VolleyError error) {
+                            Log.e(TAG, "Fallback API Error: " + error.toString());
+                            Toast.makeText(MapActivity.this,
+                                    "Ошибка получения данных", Toast.LENGTH_SHORT).show();
+                            updateMap(new ArrayList<>());
+                        }
+                    });
+
+            requestQueue.add(stringRequest);
+
+        } catch (UnsupportedEncodingException e) {
+            Log.e(TAG, "Fallback URL encoding error: " + e.getMessage());
+            updateMap(new ArrayList<>());
         }
     }
 
