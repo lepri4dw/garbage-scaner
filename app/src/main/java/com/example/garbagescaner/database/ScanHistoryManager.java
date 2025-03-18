@@ -101,16 +101,19 @@ public class ScanHistoryManager {
         List<ScanResult> history = getAllScanResults();
 
         if (position >= 0 && position < history.size()) {
-            // Получаем элемент и маркируем его как утилизированный
             ScanResult result = history.get(position);
+
             if (!result.isRecycled()) {
+                Log.d(TAG, "Marking scan as recycled: " + result.getWasteType());
+
+                // Маркируем как утилизированный
                 result.markAsRecycled();
 
-                // Сохраняем обновленную историю
-                saveHistory(history);
+                // Сохраняем историю
                 saveHistory(history);
 
                 // Проверяем достижения
+                AchievementManager achievementManager = new AchievementManager(context);
                 achievementManager.checkAndUnlockAchievements(history);
             }
         }
@@ -258,9 +261,61 @@ public class ScanHistoryManager {
         }
     }
 
-    /**
-     * Десериализатор для преобразования строки Base64 в Bitmap
-     */
+
+
+
+    public Map<String, Integer> getRecycledCountByType(StatisticPeriod period) {
+        List<ScanResult> history = getAllScanResults();
+        Map<String, Integer> countByType = new HashMap<>();
+
+        // Инициализируем все типы нулями
+        countByType.put("Пластик", 0);
+        countByType.put("Стекло", 0);
+        countByType.put("Бумага", 0);
+        countByType.put("Металл", 0);
+        countByType.put("Электроника", 0);
+        countByType.put("Пищевые отходы", 0);
+        countByType.put("Прочее", 0);
+
+        // Получаем временную метку начала периода
+        long periodStartTime = getPeriodStartTimestamp(period);
+
+        for (ScanResult result : history) {
+            // Учитываем только утилизированные отходы в заданном периоде
+            if (result.isRecycled() && result.getRecycledTimestamp() >= periodStartTime) {
+                String wasteType = result.getWasteType();
+
+                // Определяем категорию отхода
+                String category = getWasteCategory(wasteType);
+
+                // Увеличиваем счетчик для этой категории
+                countByType.put(category, countByType.get(category) + 1);
+            }
+        }
+
+        return countByType;
+    }
+
+    // Вспомогательный метод для определения категории отхода
+    private String getWasteCategory(String wasteType) {
+        wasteType = wasteType.toLowerCase();
+
+        if (wasteType.contains("пластик")) {
+            return "Пластик";
+        } else if (wasteType.contains("стекл")) {
+            return "Стекло";
+        } else if (wasteType.contains("бумаг") || wasteType.contains("картон")) {
+            return "Бумага";
+        } else if (wasteType.contains("метал")) {
+            return "Металл";
+        } else if (wasteType.contains("электрон")) {
+            return "Электроника";
+        } else if (wasteType.contains("пищев") || wasteType.contains("орган")) {
+            return "Пищевые отходы";
+        } else {
+            return "Прочее";
+        }
+    }
     private static class BitmapDeserializer implements JsonDeserializer<Bitmap> {
         @Override
         public Bitmap deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {

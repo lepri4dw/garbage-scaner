@@ -1,6 +1,7 @@
 package com.example.garbagescaner.adapters;
 
 import android.content.Context;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,7 +21,7 @@ import com.example.garbagescaner.models.ScanResult;
 import java.util.List;
 
 public class ScanHistoryAdapter extends RecyclerView.Adapter<ScanHistoryAdapter.ViewHolder> {
-
+    private static final String TAG = "ScanHistoryAdapter";
     private final Context context;
     private final List<ScanResult> scanResults;
     private final OnHistoryItemClickListener listener;
@@ -42,7 +43,6 @@ public class ScanHistoryAdapter extends RecyclerView.Adapter<ScanHistoryAdapter.
         View view = LayoutInflater.from(context).inflate(R.layout.item_scan_history, parent, false);
         return new ViewHolder(view);
     }
-
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
@@ -89,9 +89,11 @@ public class ScanHistoryAdapter extends RecyclerView.Adapter<ScanHistoryAdapter.
         });
 
         // Устанавливаем слушатель для кнопки утилизации
+        final int itemPosition = position;
         holder.btnRecycle.setOnClickListener(v -> {
+            Log.d(TAG, "Recycle button clicked for position: " + itemPosition);
             if (listener != null) {
-                listener.onRecycleClick(scanResult, holder.getAdapterPosition());
+                listener.onRecycleClick(scanResult, itemPosition);
             }
         });
     }

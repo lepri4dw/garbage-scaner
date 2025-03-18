@@ -2,10 +2,12 @@ package com.example.garbagescaner.adapters;
 
 import android.content.Context;
 import android.content.res.Resources;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -37,6 +39,7 @@ public class AchievementsAdapter extends RecyclerView.Adapter<AchievementsAdapte
         return new ViewHolder(view);
     }
 
+    // В методе onBindViewHolder в AchievementsAdapter
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Achievement achievement = achievements.get(position);
@@ -53,24 +56,36 @@ public class AchievementsAdapter extends RecyclerView.Adapter<AchievementsAdapte
             if (iconId != 0) {
                 holder.ivIcon.setImageResource(iconId);
             } else {
-                // Если иконка не найдена, используем стандартную
                 holder.ivIcon.setImageResource(R.drawable.ic_achievement_default);
             }
         } catch (Exception e) {
+            Log.e("AchievementsAdapter", "Error loading icon: " + e.getMessage());
             holder.ivIcon.setImageResource(R.drawable.ic_achievement_default);
         }
 
-        // Установка состояния разблокировки
-        if (achievement.isUnlocked()) {
-            holder.tvStatus.setText("Получено: " + formatDate(achievement.getUnlockedTimestamp()));
-            holder.tvStatus.setTextColor(ContextCompat.getColor(context, R.color.green_primary));
-            holder.itemView.setAlpha(1.0f);
-        } else {
-            holder.tvStatus.setText("Заблокировано");
-            holder.tvStatus.setTextColor(ContextCompat.getColor(context, R.color.text_secondary));
-            holder.itemView.setAlpha(0.6f);
+        // Расчет и отображение прогресса
+        int progress = achievement.getProgressPercentage();
+        holder.progressBar.setMax(100); // Убедимся, что максимум установлен правильно
+        holder.progressBar.setProgress(progress);
 
-            // Применяем затемнение к иконке для заблокированных достижений
+        Log.d("AchievementsAdapter", "Achievement: " + achievement.getTitle() +
+                ", Progress: " + achievement.getCurrentValue() + "/" + achievement.getTargetValue() +
+                " (" + progress + "%)");
+
+        // Отображение статуса
+        if (achievement.isUnlocked()) {
+            holder.tvStatus.setText("Получено");
+            holder.tvStatus.setTextColor(ContextCompat.getColor(context, R.color.green_primary));
+            holder.progressBar.setProgress(100); // Всегда 100% для разблокированных
+            holder.itemView.setAlpha(1.0f);
+            // Убираем затемнение для разблокированных достижений
+            holder.ivIcon.clearColorFilter();
+        } else {
+            holder.tvStatus.setText(String.format("Прогресс: %d из %d",
+                    achievement.getCurrentValue(), achievement.getTargetValue()));
+            holder.tvStatus.setTextColor(ContextCompat.getColor(context, R.color.text_secondary));
+            holder.itemView.setAlpha(0.8f);
+            // Затемняем иконку для не разблокированных достижений
             holder.ivIcon.setColorFilter(ContextCompat.getColor(context, R.color.text_hint));
         }
     }
@@ -89,6 +104,7 @@ public class AchievementsAdapter extends RecyclerView.Adapter<AchievementsAdapte
         ImageView ivIcon;
         TextView tvTitle;
         TextView tvDescription;
+        ProgressBar progressBar;
         TextView tvStatus;
 
         public ViewHolder(@NonNull View itemView) {
@@ -96,6 +112,7 @@ public class AchievementsAdapter extends RecyclerView.Adapter<AchievementsAdapte
             ivIcon = itemView.findViewById(R.id.ivAchievementIcon);
             tvTitle = itemView.findViewById(R.id.tvAchievementTitle);
             tvDescription = itemView.findViewById(R.id.tvAchievementDescription);
+            progressBar = itemView.findViewById(R.id.progressBarAchievement);
             tvStatus = itemView.findViewById(R.id.tvAchievementStatus);
         }
     }

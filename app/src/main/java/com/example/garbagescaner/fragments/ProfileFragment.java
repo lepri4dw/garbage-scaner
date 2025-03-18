@@ -200,24 +200,51 @@ public class ProfileFragment extends Fragment implements ScanHistoryAdapter.OnHi
 
     private void loadStatistics() {
         // Получение статистики за выбранный период
-        Map<String, Double> statistics = historyManager.getRecyclingStatistics(currentPeriod);
+        Map<String, Integer> countByType = historyManager.getRecycledCountByType(currentPeriod);
         int totalItems = historyManager.getTotalRecycledCount(currentPeriod);
-        double totalCost = 0;
 
-        // Подсчет общей стоимости
-        for (double cost : statistics.values()) {
-            totalCost += cost;
+        // Подсчет общего количества
+        int totalCount = 0;
+        for (int count : countByType.values()) {
+            totalCount += count;
         }
 
         // Установка общих значений
         tvTotalItems.setText(String.format("Всего утилизировано: %d шт.", totalItems));
-        tvTotalCost.setText(String.format("Общая стоимость: %.2f сом", totalCost));
 
-        // Настройка диаграммы
-        setupPieChart(statistics);
+        // Вместо общей стоимости показываем топ категорий
+        String topCategories = getTopCategories(countByType);
+        tvTotalCost.setText(topCategories);
+
+        // Настройка диаграммы по типам отходов
+        setupPieChart(countByType);
     }
 
-    private void setupPieChart(Map<String, Double> statistics) {
+    private String getTopCategories(Map<String, Integer> countByType) {
+        // Сортируем категории по количеству (от большего к меньшему)
+        List<Map.Entry<String, Integer>> sortedEntries = new ArrayList<>(countByType.entrySet());
+        sortedEntries.removeIf(entry -> entry.getValue() == 0); // Удаляем нулевые значения
+
+        if (sortedEntries.isEmpty()) {
+            return "Нет данных за выбранный период";
+        }
+
+        sortedEntries.sort((o1, o2) -> o2.getValue().compareTo(o1.getValue()));
+
+        // Берем максимум 3 категории для отображения
+        int maxToShow = Math.min(3, sortedEntries.size());
+        StringBuilder result = new StringBuilder("Топ категорий: ");
+
+        for (int i = 0; i < maxToShow; i++) {
+            if (i > 0) result.append(", ");
+            Map.Entry<String, Integer> entry = sortedEntries.get(i);
+            result.append(entry.getKey()).append(" (").append(entry.getValue()).append(" шт.)");
+        }
+
+        return result.toString();
+    }
+
+    private void setupPieChart(Map<String, Integer> countByType) {
         pieChart.setUsePercentValues(true);
         pieChart.getDescription().setEnabled(false);
         pieChart.setExtraOffsets(5, 10, 5, 5);
@@ -230,7 +257,7 @@ public class ProfileFragment extends Fragment implements ScanHistoryAdapter.OnHi
         List<PieEntry> entries = new ArrayList<>();
 
         // Добавляем только ненулевые значения
-        for (Map.Entry<String, Double> entry : statistics.entrySet()) {
+        for (Map.Entry<String, Integer> entry : countByType.entrySet()) {
             if (entry.getValue() > 0) {
                 entries.add(new PieEntry(entry.getValue().floatValue(), entry.getKey()));
             }
@@ -276,9 +303,13 @@ public class ProfileFragment extends Fragment implements ScanHistoryAdapter.OnHi
         tvAchievementsCount.setText(String.format("Получено %d из %d",
                 unlockedAchievements.size(), allAchievements.size()));
 
-        // Настройка адаптера для достижений
-        AchievementsAdapter adapter = new AchievementsAdapter(requireContext(), allAchievements);
-        recyclerViewAchievements.setAdapter(adapter);
+        if (recyclerViewAchievements.getAdapter() == null) {
+            AchievementsAdapter adapter = new AchievementsAdapter(requireContext(), allAchievements);
+            recyclerViewAchievements.setAdapter(adapter);
+        } else {
+            // Если адаптер уже существует, просто обновляем данные
+            ((AchievementsAdapter) recyclerViewAchievements.getAdapter()).notifyDataSetChanged();
+        }
     }
 
     @Override
