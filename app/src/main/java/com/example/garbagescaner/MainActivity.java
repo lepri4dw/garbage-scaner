@@ -1,6 +1,7 @@
 package com.example.garbagescaner;
 
 import android.os.Bundle;
+import android.view.Menu;
 import android.view.MenuItem;
 
 import androidx.annotation.NonNull;
@@ -16,6 +17,22 @@ import com.google.android.material.navigation.NavigationBarView;
 public class MainActivity extends AppCompatActivity implements NavigationBarView.OnItemSelectedListener {
 
     private BottomNavigationView bottomNavigationView;
+
+    // В классе MainActivity добавьте этот метод
+    public void setNavigationEnabled(boolean enabled) {
+        // Получаем BottomNavigationView
+        BottomNavigationView bottomNavigationView = findViewById(R.id.bottom_navigation);
+        if (bottomNavigationView != null) {
+            // Устанавливаем состояние активности для всех элементов меню
+            Menu menu = bottomNavigationView.getMenu();
+            for (int i = 0; i < menu.size(); i++) {
+                menu.getItem(i).setEnabled(enabled);
+            }
+
+            // Также можно добавить визуальный индикатор, например изменение прозрачности
+            bottomNavigationView.setAlpha(enabled ? 1.0f : 0.5f);
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

@@ -1,12 +1,15 @@
 package com.example.garbagescaner.database;
 
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Base64;
 import android.util.Log;
+import android.widget.Toast;
 
+import com.example.garbagescaner.R;
 import com.example.garbagescaner.models.ScanResult;
 import com.example.garbagescaner.models.StatisticPeriod;
 import com.google.gson.Gson;
@@ -95,6 +98,35 @@ public class ScanHistoryManager {
         // Проверяем достижения
         achievementManager.checkAndUnlockAchievements(history);
     }
+    private void showStreakMilestoneDialog(int streakDays) {
+        // Создаем и настраиваем диалог
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        builder.setTitle("Поздравляем!");
+
+        String message;
+        switch (streakDays) {
+            case 7:
+                message = "Вы утилизируете отходы 7 дней подряд! Продолжайте в том же духе!";
+                break;
+            case 30:
+                message = "Целый месяц ежедневных утилизаций! Вы настоящий защитник природы!";
+                break;
+            case 100:
+                message = "100 дней подряд! Ваш вклад в защиту окружающей среды неоценим!";
+                break;
+            default:
+                message = "Вы утилизируете отходы " + streakDays + " дней подряд!";
+                break;
+        }
+
+        builder.setMessage(message);
+        builder.setPositiveButton("Спасибо!", null);
+        builder.setIcon(R.drawable.ic_streak_flame);
+
+        // Показываем диалог
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
 
     // Метод для обновления результата сканирования (маркировка как утилизированного)
     public void markAsRecycled(int position) {
@@ -111,6 +143,20 @@ public class ScanHistoryManager {
 
                 // Сохраняем историю
                 saveHistory(history);
+                StreakManager streakManager = new StreakManager(context);
+                boolean streakIncreased = streakManager.registerRecycling();
+
+                if (streakIncreased) {
+                    int currentStreak = streakManager.getCurrentStreak();
+                    Toast.makeText(context,
+                            "Ударный режим: " + currentStreak + " дней подряд!",
+                            Toast.LENGTH_SHORT).show();
+
+                    // Можно добавить специальное уведомление для круглых чисел
+                    if (currentStreak == 7 || currentStreak == 30 || currentStreak == 100) {
+                        showStreakMilestoneDialog(currentStreak);
+                    }
+                }
 
                 // Проверяем достижения
                 AchievementManager achievementManager = new AchievementManager(context);

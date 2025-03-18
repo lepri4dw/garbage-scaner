@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 import com.example.garbagescaner.R;
+import com.example.garbagescaner.dialogs.NotRecycledDetailsDialog;
 import com.example.garbagescaner.dialogs.RecyclingDetailsDialog;
 import com.example.garbagescaner.models.ScanResult;
 
@@ -44,6 +45,8 @@ public class ScanHistoryAdapter extends RecyclerView.Adapter<ScanHistoryAdapter.
         return new ViewHolder(view);
     }
 
+    // В методе onBindViewHolder класса ScanHistoryAdapter
+
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         ScanResult scanResult = scanResults.get(position);
@@ -58,12 +61,32 @@ public class ScanHistoryAdapter extends RecyclerView.Adapter<ScanHistoryAdapter.
             holder.tvStatus.setVisibility(View.VISIBLE);
             holder.tvStatus.setText("Утилизировано: " + scanResult.getFormattedRecycledDate());
             holder.tvStatus.setTextColor(ContextCompat.getColor(context, R.color.green_primary));
-            // Добавляем затемнение для утилизированных элементов
             holder.itemView.setAlpha(0.7f);
+
+            // Для утилизированных - показываем диалог с деталями
+            holder.itemView.setOnClickListener(v -> {
+                RecyclingDetailsDialog dialog = new RecyclingDetailsDialog(context);
+                dialog.show(scanResult);
+            });
         } else {
             holder.btnRecycle.setVisibility(View.VISIBLE);
             holder.tvStatus.setVisibility(View.GONE);
             holder.itemView.setAlpha(1.0f);
+
+            // Для неутилизированных - показываем диалог с кнопкой утилизации
+            final int itemPosition = position;
+            holder.itemView.setOnClickListener(v -> {
+                NotRecycledDetailsDialog dialog = new NotRecycledDetailsDialog(context,
+                        new NotRecycledDetailsDialog.OnRecycleClickListener() {
+                            @Override
+                            public void onRecycleClick(ScanResult scanResult, int position) {
+                                if (listener != null) {
+                                    listener.onRecycleClick(scanResult, itemPosition);
+                                }
+                            }
+                        });
+                dialog.show(scanResult, itemPosition);
+            });
         }
 
         // Загрузка изображения с помощью Glide
@@ -76,24 +99,10 @@ public class ScanHistoryAdapter extends RecyclerView.Adapter<ScanHistoryAdapter.
             holder.imageView.setImageResource(R.drawable.ic_scanner);
         }
 
-        // Устанавливаем слушатель клика по элементу
-        holder.itemView.setOnClickListener(v -> {
-            if (scanResult.isRecycled()) {
-                // Для утилизированных элементов показываем диалог с деталями
-                RecyclingDetailsDialog dialog = new RecyclingDetailsDialog(context);
-                dialog.show(scanResult);
-            } else if (listener != null) {
-                // Для неутилизированных элементов открываем карту
-                listener.onItemClick(scanResult);
-            }
-        });
-
         // Устанавливаем слушатель для кнопки утилизации
-        final int itemPosition = position;
         holder.btnRecycle.setOnClickListener(v -> {
-            Log.d(TAG, "Recycle button clicked for position: " + itemPosition);
             if (listener != null) {
-                listener.onRecycleClick(scanResult, itemPosition);
+                listener.onRecycleClick(scanResult, position);
             }
         });
     }

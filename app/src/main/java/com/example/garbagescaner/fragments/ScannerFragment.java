@@ -1,6 +1,7 @@
 package com.example.garbagescaner.fragments;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -15,6 +16,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
@@ -24,6 +26,7 @@ import androidx.fragment.app.Fragment;
 
 import com.bumptech.glide.Glide;
 import com.example.garbagescaner.CameraActivity;
+import com.example.garbagescaner.MainActivity;
 import com.example.garbagescaner.R;
 import com.example.garbagescaner.database.ScanHistoryManager;
 import com.example.garbagescaner.maps.MapActivity;
@@ -59,7 +62,9 @@ public class ScannerFragment extends Fragment {
     private GeminiApiClient geminiApiClient;
     private ScanHistoryManager historyManager;
 
-    // Лаунчеры для выбора изображения и сканирования камерой
+    private boolean isProcessing = false;
+
+
     private ActivityResultLauncher<Intent> imagePickerLauncher;
     private ActivityResultLauncher<Intent> cameraLauncher;
 
@@ -85,6 +90,40 @@ public class ScannerFragment extends Fragment {
 
         // Инициализируем менеджер истории сканирований
         historyManager = new ScanHistoryManager(requireContext());
+
+        // В методе onViewCreated в ScannerFragment добавьте обработчик нажатия кнопки "Назад"
+        requireActivity().getOnBackPressedDispatcher().addCallback(getViewLifecycleOwner(),
+                new OnBackPressedCallback(true) {
+                    @Override
+                    public void handleOnBackPressed() {
+                        if (isProcessing) {
+                            // Если идет обработка, показываем диалог подтверждения
+                            AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+                            builder.setTitle("Прервать анализ?");
+                            builder.setMessage("Анализ изображения еще не завершен. Вы уверены, что хотите прервать процесс?");
+                            builder.setPositiveButton("Да", (dialog, which) -> {
+                                // Прерываем процесс и возвращаемся назад
+                                isProcessing = false;
+                                showLoading(false);
+
+                                // Включаем навигацию обратно
+                                if (getActivity() instanceof MainActivity) {
+                                    ((MainActivity) getActivity()).setNavigationEnabled(true);
+                                }
+
+                                // Разрешаем стандартную обработку нажатия "Назад"
+                                this.setEnabled(false);
+                                requireActivity().onBackPressed();
+                            });
+                            builder.setNegativeButton("Нет", null);
+                            builder.show();
+                        } else {
+                            // Если обработка не идет, разрешаем стандартную обработку нажатия "Назад"
+                            this.setEnabled(false);
+                            requireActivity().onBackPressed();
+                        }
+                    }
+                });
     }
 
     private void initializeViews(View view) {
@@ -207,8 +246,13 @@ public class ScannerFragment extends Fragment {
     }
 
     private void processImage(Bitmap bitmap) {
+        isProcessing = true;
         showLoading(true);
         hideResult();
+
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setNavigationEnabled(false);
+        }
 
         visionApiClient.analyzeImage(bitmap, new VisionApiClient.VisionApiListener() {
             @Override
@@ -227,6 +271,12 @@ public class ScannerFragment extends Fragment {
 
                 getActivity().runOnUiThread(() -> {
                     showLoading(false);
+                    isProcessing = false;
+
+
+                    if (getActivity() instanceof MainActivity) {
+                        ((MainActivity) getActivity()).setNavigationEnabled(true);
+                    }
                     Toast.makeText(requireContext(), "Ошибка анализа изображения: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
             }
@@ -240,7 +290,12 @@ public class ScannerFragment extends Fragment {
                 if (getActivity() == null) return;
 
                 getActivity().runOnUiThread(() -> {
+                    isProcessing = false;
                     showLoading(false);
+
+                    if (getActivity() instanceof MainActivity) {
+                        ((MainActivity) getActivity()).setNavigationEnabled(true);
+                    }
                     displayResult(garbageInfo);
 
                     // Сохраняем результат сканирования в историю
@@ -265,6 +320,7 @@ public class ScannerFragment extends Fragment {
             }
         });
     }
+
 
     private void saveScanToHistory() {
         // Создаем объект результата сканирования
