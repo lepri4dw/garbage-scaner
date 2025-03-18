@@ -9,7 +9,9 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
 import android.widget.Toast;
-
+import android.content.Intent;
+import android.net.Uri;
+import android.widget.Button;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.android.volley.Request;
@@ -51,6 +53,7 @@ public class MapActivity extends AppCompatActivity {
 
     private RequestQueue requestQueue;
 
+    // 3. Вызовите этот метод в onCreate()
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -64,6 +67,9 @@ public class MapActivity extends AppCompatActivity {
         // Инициализация Spinner
         materialSpinner = findViewById(R.id.materialSpinner);
         setupSpinner();
+
+        // Настройка кнопки "Открыть в 2ГИС"
+        setupOpenInAppButton();
 
         // Инициализация Volley для HTTP запросов
         requestQueue = Volley.newRequestQueue(this);
@@ -142,6 +148,75 @@ public class MapActivity extends AppCompatActivity {
         materialSpinner.setSelection(position);
         // При нулевой позиции (Выберите материал) мы все равно
         // будем показывать пункты "Прочее", благодаря изменениям в onItemSelected
+    }
+
+    // 1. Добавьте эту функцию в ваш класс MapActivity
+    private void open2GisApp(String searchQuery) {
+        // Базовый URI для открытия 2ГИС
+        String uri = "dgis://2gis.ru/search/";
+
+        try {
+            // Кодирование поискового запроса
+            String encodedQuery = URLEncoder.encode(searchQuery, "UTF-8");
+
+            // Создание Intent для открытия приложения
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setData(Uri.parse(uri + encodedQuery));
+
+            // Проверка наличия приложения 2ГИС
+            if (intent.resolveActivity(getPackageManager()) != null) {
+                startActivity(intent);
+            } else {
+                // Резервный вариант - открыть в браузере
+                intent.setData(Uri.parse("https://2gis.ru/search/" + encodedQuery));
+                startActivity(intent);
+                Toast.makeText(this, "Приложение 2ГИС не установлено", Toast.LENGTH_SHORT).show();
+            }
+        } catch (UnsupportedEncodingException e) {
+            Log.e(TAG, "Ошибка кодирования запроса: " + e.getMessage());
+            Toast.makeText(this, "Ошибка при открытии 2ГИС", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // 2. Добавьте кнопку в метод onCreate() после инициализации WebView
+    private void setupOpenInAppButton() {
+        Button openIn2GisButton = findViewById(R.id.openIn2GisButton);
+        openIn2GisButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Получение выбранного материала
+                String selectedMaterial = (String) materialSpinner.getSelectedItem();
+                String searchQuery;
+
+                // Определение поискового запроса в зависимости от выбранного материала
+                switch (selectedMaterial) {
+                    case "Пластик":
+                        searchQuery = PLASTIC_QUERY;
+                        break;
+                    case "Стекло":
+                        searchQuery = GLASS_QUERY;
+                        break;
+                    case "Бумага":
+                        searchQuery = PAPER_QUERY;
+                        break;
+                    case "Металл":
+                        searchQuery = METAL_QUERY;
+                        break;
+                    case "Электроника":
+                        searchQuery = ELECTRONICS_QUERY;
+                        break;
+                    case "Пищевые отходы":
+                        searchQuery = FOOD_QUERY;
+                        break;
+                    default:
+                        searchQuery = OTHER_QUERY;
+                        break;
+                }
+
+                // Открытие 2ГИС с заданным поисковым запросом
+                open2GisApp(searchQuery);
+            }
+        });
     }
 
     private void loadInitialMap() {
