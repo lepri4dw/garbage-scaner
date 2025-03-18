@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 import com.example.garbagescaner.R;
+import com.example.garbagescaner.dialogs.RecyclingDetailsDialog;
 import com.example.garbagescaner.models.ScanResult;
 
 import java.util.List;
@@ -41,6 +42,7 @@ public class ScanHistoryAdapter extends RecyclerView.Adapter<ScanHistoryAdapter.
         View view = LayoutInflater.from(context).inflate(R.layout.item_scan_history, parent, false);
         return new ViewHolder(view);
     }
+
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
@@ -76,7 +78,12 @@ public class ScanHistoryAdapter extends RecyclerView.Adapter<ScanHistoryAdapter.
 
         // Устанавливаем слушатель клика по элементу
         holder.itemView.setOnClickListener(v -> {
-            if (listener != null) {
+            if (scanResult.isRecycled()) {
+                // Для утилизированных элементов показываем диалог с деталями
+                RecyclingDetailsDialog dialog = new RecyclingDetailsDialog(context);
+                dialog.show(scanResult);
+            } else if (listener != null) {
+                // Для неутилизированных элементов открываем карту
                 listener.onItemClick(scanResult);
             }
         });

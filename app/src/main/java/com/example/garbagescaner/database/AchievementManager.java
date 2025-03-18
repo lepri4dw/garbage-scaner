@@ -7,6 +7,7 @@ import android.widget.Toast;
 
 import com.example.garbagescaner.models.Achievement;
 import com.example.garbagescaner.models.ScanResult;
+import com.example.garbagescaner.utils.NotificationHelper;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -286,10 +287,15 @@ public class AchievementManager {
         return false;
     }
 
+    // Обновим метод unlockAchievement в AchievementManager.java
     public Achievement unlockAchievement(int achievementId) {
         for (Achievement achievement : achievements) {
             if (achievement.getId() == achievementId && !achievement.isUnlocked()) {
                 achievement.unlock();
+
+                // Показываем уведомление
+                NotificationHelper notificationHelper = new NotificationHelper(context);
+                notificationHelper.showAchievementNotification(achievement);
 
                 // Уведомляем пользователя
                 Toast.makeText(context,
