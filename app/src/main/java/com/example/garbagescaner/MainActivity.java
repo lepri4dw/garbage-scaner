@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.view.View;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -17,12 +18,15 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
+import androidx.core.content.ContextCompat;
 
 import com.bumptech.glide.Glide;
 import com.example.garbagescaner.maps.MapActivity;
 import com.example.garbagescaner.remote.client.GeminiApiClient;
 import com.example.garbagescaner.remote.client.VisionApiClient;
 import com.example.garbagescaner.remote.gemini.GarbageInfo;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.karumi.dexter.Dexter;
 import com.karumi.dexter.PermissionToken;
 import com.karumi.dexter.listener.PermissionDeniedResponse;
@@ -37,10 +41,11 @@ public class MainActivity extends AppCompatActivity {
     private static final String GEMINI_API_KEY = "AIzaSyCl8qzbbpDJ-ltNr_86SSFMTnbC6vhXvCk";
 
     private ImageView imageView;
-    private Button btnSelectImage;
-    private Button btnScanWithCamera; // Кнопка для сканирования камерой
-    private Button btnFindRecyclingPoints; // Кнопка для поиска пунктов приема
+    private MaterialButton btnSelectImage;
+    private MaterialButton btnScanWithCamera;
+    private MaterialButton btnFindRecyclingPoints;
     private TextView tvLoading;
+    private CircularProgressIndicator progressIndicator;
     private CardView cardResult;
     private TextView tvGarbageType;
     private TextView tvInstructions;
@@ -60,10 +65,17 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // Настройка статус-бара и навигационного бара
+        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.black));
+        getWindow().setNavigationBarColor(ContextCompat.getColor(this, R.color.black));
+
         initializeViews();
         initializeClients();
         setupLaunchers();
         setupListeners();
+
+        // Добавляем анимацию для появления элементов
+        animateElements();
     }
 
     private void initializeViews() {
@@ -72,6 +84,7 @@ public class MainActivity extends AppCompatActivity {
         btnScanWithCamera = findViewById(R.id.btnScanWithCamera);
         btnFindRecyclingPoints = findViewById(R.id.btnFindRecyclingPoints);
         tvLoading = findViewById(R.id.tvLoading);
+        progressIndicator = findViewById(R.id.progressIndicator);
         cardResult = findViewById(R.id.cardResult);
         tvGarbageType = findViewById(R.id.tvGarbageType);
         tvInstructions = findViewById(R.id.tvInstructions);
@@ -127,6 +140,34 @@ public class MainActivity extends AppCompatActivity {
         btnSelectImage.setOnClickListener(v -> checkPermissionAndPickImage());
         btnScanWithCamera.setOnClickListener(v -> openCameraScanner());
         btnFindRecyclingPoints.setOnClickListener(v -> openMap());
+    }
+
+    private void animateElements() {
+        // Анимация логотипа
+        ImageView logo = findViewById(R.id.appLogo);
+        TextView appName = findViewById(R.id.tvAppName);
+
+        logo.setAlpha(0f);
+        logo.setTranslationY(-50f);
+        logo.animate().alpha(1f).translationY(0f).setDuration(1000).setInterpolator(new DecelerateInterpolator()).start();
+
+        appName.setAlpha(0f);
+        appName.animate().alpha(1f).setStartDelay(300).setDuration(1000).start();
+
+        // Анимация карточки изображения
+        View imageCard = findViewById(R.id.imageCardView);
+        imageCard.setAlpha(0f);
+        imageCard.setTranslationY(50f);
+        imageCard.animate().alpha(1f).translationY(0f).setStartDelay(600).setDuration(1000).setInterpolator(new DecelerateInterpolator()).start();
+
+        // Анимация кнопок
+        btnSelectImage.setAlpha(0f);
+        btnSelectImage.setTranslationY(50f);
+        btnSelectImage.animate().alpha(1f).translationY(0f).setStartDelay(800).setDuration(1000).setInterpolator(new DecelerateInterpolator()).start();
+
+        btnScanWithCamera.setAlpha(0f);
+        btnScanWithCamera.setTranslationY(50f);
+        btnScanWithCamera.animate().alpha(1f).translationY(0f).setStartDelay(1000).setDuration(1000).setInterpolator(new DecelerateInterpolator()).start();
     }
 
     private void checkPermissionAndPickImage() {
@@ -228,9 +269,19 @@ public class MainActivity extends AppCompatActivity {
 
     private void showLoading(boolean isLoading) {
         tvLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+        progressIndicator.setVisibility(isLoading ? View.VISIBLE : View.GONE);
         btnSelectImage.setEnabled(!isLoading);
         btnScanWithCamera.setEnabled(!isLoading);
         btnFindRecyclingPoints.setEnabled(!isLoading);
+
+        if (isLoading) {
+            // Анимация появления индикаторов загрузки
+            tvLoading.setAlpha(0f);
+            tvLoading.animate().alpha(1f).setDuration(500).start();
+
+            progressIndicator.setAlpha(0f);
+            progressIndicator.animate().alpha(1f).setDuration(500).start();
+        }
     }
 
     private void hideResult() {
@@ -242,10 +293,18 @@ public class MainActivity extends AppCompatActivity {
         tvGarbageType.setText("Тип отхода: " + garbageInfo.getType());
         tvInstructions.setText("Инструкция по подготовке: " + garbageInfo.getInstructions());
         tvEstimatedCost.setText("Оценочная стоимость: " + garbageInfo.getEstimatedCost());
-        cardResult.setVisibility(View.VISIBLE);
 
-        // Показываем кнопку поиска пунктов приема
+        // Показываем карточку с анимацией
+        cardResult.setAlpha(0f);
+        cardResult.setTranslationY(50f);
+        cardResult.setVisibility(View.VISIBLE);
+        cardResult.animate().alpha(1f).translationY(0f).setDuration(500).setInterpolator(new DecelerateInterpolator()).start();
+
+        // Показываем кнопку поиска пунктов приема с анимацией
+        btnFindRecyclingPoints.setAlpha(0f);
+        btnFindRecyclingPoints.setTranslationY(50f);
         btnFindRecyclingPoints.setVisibility(View.VISIBLE);
+        btnFindRecyclingPoints.animate().alpha(1f).translationY(0f).setStartDelay(300).setDuration(500).setInterpolator(new DecelerateInterpolator()).start();
 
         // Сохраняем текущий тип отхода для передачи в MapActivity
         currentWasteType = garbageInfo.getType();

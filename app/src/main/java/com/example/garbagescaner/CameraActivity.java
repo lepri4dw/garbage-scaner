@@ -1,6 +1,7 @@
 package com.example.garbagescaner;
 
 import android.Manifest;
+import android.animation.ValueAnimator;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -8,6 +9,7 @@ import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -24,6 +26,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.File;
@@ -38,14 +41,20 @@ public class CameraActivity extends AppCompatActivity {
 
     private ImageCapture imageCapture;
     private PreviewView viewFinder;
-    private ProgressBar progressBar;
+    private CircularProgressIndicator progressBar;
     private TextView statusText;
+    private View scanFrame;
     private final Executor executor = Executors.newSingleThreadExecutor();
+    private ValueAnimator scanFrameAnimator;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera);
+
+        // Настройка статус-бара и навигационного бара
+        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.black));
+        getWindow().setNavigationBarColor(ContextCompat.getColor(this, R.color.black));
 
         try {
             // Инициализация UI компонентов
@@ -53,6 +62,10 @@ public class CameraActivity extends AppCompatActivity {
             FloatingActionButton captureButton = findViewById(R.id.capture_button);
             progressBar = findViewById(R.id.progressBar);
             statusText = findViewById(R.id.status_text);
+            scanFrame = findViewById(R.id.scanFrame);
+
+            // Добавляем пульсирующую анимацию для рамки сканирования
+            startScanFrameAnimation();
 
             // Проверка разрешений
             if (allPermissionsGranted()) {
@@ -65,8 +78,35 @@ public class CameraActivity extends AppCompatActivity {
             captureButton.setOnClickListener(v -> takePhoto());
 
         } catch (Exception e) {
+            // Ловим любые исключения при инициализации
             Log.e(TAG, "Ошибка при инициализации: ", e);
             Toast.makeText(this, "Ошибка инициализации: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void startScanFrameAnimation() {
+        // Создаем анимацию пульсации для рамки сканирования
+        scanFrameAnimator = ValueAnimator.ofFloat(1.0f, 1.1f);
+        scanFrameAnimator.setDuration(1000);
+        scanFrameAnimator.setRepeatCount(ValueAnimator.INFINITE);
+        scanFrameAnimator.setRepeatMode(ValueAnimator.REVERSE);
+        scanFrameAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
+
+        scanFrameAnimator.addUpdateListener(animation -> {
+            float value = (float) animation.getAnimatedValue();
+            scanFrame.setScaleX(value);
+            scanFrame.setScaleY(value);
+        });
+
+        scanFrameAnimator.start();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Останавливаем анимацию при уничтожении активности
+        if (scanFrameAnimator != null && scanFrameAnimator.isRunning()) {
+            scanFrameAnimator.cancel();
         }
     }
 
@@ -110,7 +150,7 @@ public class CameraActivity extends AppCompatActivity {
             cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture);
 
             if (statusText != null) {
-                statusText.setText("Камера готова");
+                statusText.setText("Поместите отход в рамку");
             }
         } catch (Exception e) {
             Log.e(TAG, "Ошибка привязки камеры: ", e);
@@ -167,18 +207,8 @@ public class CameraActivity extends AppCompatActivity {
                                     return;
                                 }
 
-                                // Создаем Bitmap из файла
-                                Bitmap bitmap = BitmapFactory.decodeFile(photoFile.getAbsolutePath());
-                                if (bitmap != null) {
-                                    // Возвращаем результат в MainActivity
-                                    returnImageResult(bitmap);
-                                } else {
-                                    Log.e(TAG, "Не удалось создать bitmap из файла");
-                                    if (progressBar != null) {
-                                        progressBar.setVisibility(View.GONE);
-                                    }
-                                    Toast.makeText(CameraActivity.this, "Ошибка обработки изображения", Toast.LENGTH_SHORT).show();
-                                }
+                                // Возвращаем результат в MainActivity
+                                returnImageResult(photoFile.getAbsolutePath());
 
                             } catch (Exception e) {
                                 Log.e(TAG, "Ошибка после сохранения изображения: ", e);
@@ -211,27 +241,18 @@ public class CameraActivity extends AppCompatActivity {
         }
     }
 
-    private void returnImageResult(Bitmap bitmap) {
-        // Создаем временный файл для хранения Bitmap
+    private void returnImageResult(String imagePath) {
         try {
-            File cacheDir = getCacheDir();
-            File outputFile = new File(cacheDir, "scanned_image.jpg");
-
-            // Записываем Bitmap в файл
-            java.io.FileOutputStream fos = new java.io.FileOutputStream(outputFile);
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos);
-            fos.close();
-
             // Создаем Intent с результатом
             Intent resultIntent = new Intent();
-            resultIntent.putExtra("image_path", outputFile.getAbsolutePath());
+            resultIntent.putExtra("image_path", imagePath);
             setResult(RESULT_OK, resultIntent);
 
             // Завершаем активность
             finish();
         } catch (Exception e) {
-            Log.e(TAG, "Ошибка при сохранении результата: ", e);
-            Toast.makeText(this, "Ошибка при сохранении результата", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Ошибка при возврате результата: ", e);
+            Toast.makeText(this, "Ошибка при возврате результата", Toast.LENGTH_SHORT).show();
             setResult(RESULT_CANCELED);
             finish();
         }
