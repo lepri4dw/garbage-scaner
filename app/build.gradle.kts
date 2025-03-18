@@ -60,6 +60,12 @@ dependencies {
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
 
+    // 2GIS SDK
+    implementation("ru.dgis.sdk:sdk-full:12.4.0")
+    implementation("com.android.volley:volley:1.2.1")
+    // Retrofit для работы с API
+    implementation("com.google.code.gson:gson:2.10.1")
+
     // Google Cloud Vision API
     implementation("com.google.cloud:google-cloud-vision:3.7.0")
     implementation("com.google.api:gax-grpc:2.22.0")
