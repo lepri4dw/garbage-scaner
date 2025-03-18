@@ -22,6 +22,15 @@ public class GeminiApiClient {
     private final GeminiService service;
     private final String apiKey;
 
+    // Определение типов отходов для поиска на карте
+    private static final String TYPE_PLASTIC = "Пластик";
+    private static final String TYPE_GLASS = "Стекло";
+    private static final String TYPE_PAPER = "Бумага";
+    private static final String TYPE_METAL = "Металл";
+    private static final String TYPE_ELECTRONICS = "Электроника";
+    private static final String TYPE_FOOD = "Пищевые отходы";
+    private static final String TYPE_OTHER = "Прочее"; // Для неопределенных типов
+
     public GeminiApiClient(String apiKey) {
         this.apiKey = apiKey;
         Retrofit retrofit = new Retrofit.Builder()
@@ -41,15 +50,14 @@ public class GeminiApiClient {
         StringBuilder prompt = new StringBuilder();
         prompt.append("Определи тип отхода на основе следующих тегов: ");
         prompt.append(String.join(", ", labels));
-        prompt.append(". Ответь в следующем формате без дополнительных комментариев:\n");
-        prompt.append("Тип отхода: [тип отхода]\n");
+        prompt.append(". Выбери ТОЛЬКО ОДИН из следующих типов отходов: Пластик, Стекло, Бумага, Металл, Электроника, Пищевые отходы, Прочее.\n");
+        prompt.append("Если не можешь точно определить тип, выбери 'Прочее'.\n");
+        prompt.append("Ответь в следующем формате без дополнительных комментариев:\n");
+        prompt.append("Тип отхода: [один из указанных типов]\n");
         prompt.append("Инструкция по подготовке: [инструкция]\n");
         prompt.append("Оценочная стоимость: [стоимость]\n");
-        prompt.append("Определи тип отхода на основе следующих тегов: ");
-        prompt.append(String.join(", ", labels));
-        prompt.append(". Будь максимально точным в определении материала, цвета и типа отхода.");
-        prompt.append(". Назови приблизительную цену в сомах для Бишкека в 2025 году. То есть в цене лучше писать например 10 сом/кг");
-        prompt.append("Ответь в следующем формате без дополнительных комментариев:\n");
+        prompt.append("Будь максимально точным в определении материала, цвета и типа отхода.");
+        prompt.append(" Назови приблизительную цену в сомах для Бишкека в 2025 году. То есть в цене лучше писать например 10 сом/кг");
 
         GeminiRequest request = new GeminiRequest(prompt.toString());
 
@@ -62,32 +70,43 @@ public class GeminiApiClient {
                         GarbageInfo garbageInfo = parseGeminiResponse(text);
                         listener.onSuccess(garbageInfo);
                     } catch (Exception e) {
-                        listener.onError(new Exception("Ошибка при обработке ответа Gemini"));
+                        Log.e(TAG, "Ошибка при обработке ответа Gemini: " + e.getMessage());
+                        // В случае ошибки создаем объект с типом "Прочее"
+                        listener.onSuccess(new GarbageInfo(TYPE_OTHER,
+                                "Информация недоступна", "Информация недоступна"));
                     }
                 } else {
                     try {
                         String errorBody = response.errorBody() != null ? response.errorBody().string() : "Unknown error";
-                        listener.onError(new Exception("Ошибка API: " + errorBody));
+                        Log.e(TAG, "Ошибка API: " + errorBody);
+                        // При ошибке API также возвращаем объект с типом "Прочее" вместо ошибки
+                        listener.onSuccess(new GarbageInfo(TYPE_OTHER,
+                                "Информация недоступна", "Информация недоступна"));
                     } catch (IOException e) {
-                        listener.onError(new Exception("Ошибка при чтении ответа API"));
+                        // При ошибке также возвращаем объект с типом "Прочее"
+                        listener.onSuccess(new GarbageInfo(TYPE_OTHER,
+                                "Информация недоступна", "Информация недоступна"));
                     }
                 }
             }
 
             @Override
             public void onFailure(Call<GeminiResponse> call, Throwable t) {
-                listener.onError(new Exception("Ошибка соединения: " + t.getMessage()));
+                Log.e(TAG, "Ошибка соединения: " + t.getMessage());
+                // При ошибке соединения также возвращаем объект с типом "Прочее"
+                listener.onSuccess(new GarbageInfo(TYPE_OTHER,
+                        "Информация недоступна", "Информация недоступна"));
             }
 
             private GarbageInfo parseGeminiResponse(String text) {
-                String type = "";
+                String rawType = "";
                 String instructions = "";
                 String estimatedCost = "";
 
                 String[] lines = text.split("\n");
                 for (String line : lines) {
                     if (line.startsWith("Тип отхода:")) {
-                        type = line.substring("Тип отхода:".length()).trim();
+                        rawType = line.substring("Тип отхода:".length()).trim();
                     } else if (line.startsWith("Инструкция по подготовке:")) {
                         instructions = line.substring("Инструкция по подготовке:".length()).trim();
                     } else if (line.startsWith("Оценочная стоимость:")) {
@@ -95,7 +114,37 @@ public class GeminiApiClient {
                     }
                 }
 
-                return new GarbageInfo(type, instructions, estimatedCost);
+                // Проверка на пустое значение типа
+                if (rawType.isEmpty()) {
+                    rawType = TYPE_OTHER;
+                }
+
+                // Определяем стандартизированный тип отхода на основе ответа Gemini
+                String standardizedType = standardizeWasteType(rawType);
+
+                return new GarbageInfo(standardizedType, instructions, estimatedCost);
+            }
+
+            // Метод для стандартизации типа отхода
+            private String standardizeWasteType(String rawType) {
+                rawType = rawType.toLowerCase();
+
+                if (rawType.contains("пластик") || rawType.contains("пэт")) {
+                    return TYPE_PLASTIC;
+                } else if (rawType.contains("стекл")) {
+                    return TYPE_GLASS;
+                } else if (rawType.contains("бумаг") || rawType.contains("картон")) {
+                    return TYPE_PAPER;
+                } else if (rawType.contains("метал")) {
+                    return TYPE_METAL;
+                } else if (rawType.contains("электро") || rawType.contains("техник")) {
+                    return TYPE_ELECTRONICS;
+                } else if (rawType.contains("пищев") || rawType.contains("еда") || rawType.contains("пища") ||
+                        rawType.contains("органич") || rawType.contains("компост") || rawType.contains("био")) {
+                    return TYPE_FOOD;
+                } else {
+                    return TYPE_OTHER;
+                }
             }
         });
     }

@@ -16,6 +16,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven ("https://artifactory.2gis.dev/sdk-maven-release" )
+
     }
 }
 

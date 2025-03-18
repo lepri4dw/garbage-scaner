@@ -19,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 
 import com.bumptech.glide.Glide;
+import com.example.garbagescaner.maps.MapActivity;
 import com.example.garbagescaner.remote.client.GeminiApiClient;
 import com.example.garbagescaner.remote.client.VisionApiClient;
 import com.example.garbagescaner.remote.gemini.GarbageInfo;
@@ -37,7 +38,8 @@ public class MainActivity extends AppCompatActivity {
 
     private ImageView imageView;
     private Button btnSelectImage;
-    private Button btnScanWithCamera; // Новая кнопка для сканирования камерой
+    private Button btnScanWithCamera; // Кнопка для сканирования камерой
+    private Button btnFindRecyclingPoints; // Кнопка для поиска пунктов приема
     private TextView tvLoading;
     private CardView cardResult;
     private TextView tvGarbageType;
@@ -50,6 +52,8 @@ public class MainActivity extends AppCompatActivity {
     // Лаунчеры для выбора изображения и сканирования камерой
     private ActivityResultLauncher<Intent> imagePickerLauncher;
     private ActivityResultLauncher<Intent> cameraLauncher;
+
+    private String currentWasteType; // Для хранения текущего типа отхода
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,7 +69,8 @@ public class MainActivity extends AppCompatActivity {
     private void initializeViews() {
         imageView = findViewById(R.id.imageView);
         btnSelectImage = findViewById(R.id.btnSelectImage);
-        btnScanWithCamera = findViewById(R.id.btnScanWithCamera); // Инициализация новой кнопки
+        btnScanWithCamera = findViewById(R.id.btnScanWithCamera);
+        btnFindRecyclingPoints = findViewById(R.id.btnFindRecyclingPoints);
         tvLoading = findViewById(R.id.tvLoading);
         cardResult = findViewById(R.id.cardResult);
         tvGarbageType = findViewById(R.id.tvGarbageType);
@@ -120,7 +125,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupListeners() {
         btnSelectImage.setOnClickListener(v -> checkPermissionAndPickImage());
-        btnScanWithCamera.setOnClickListener(v -> openCameraScanner()); // Добавление обработчика для новой кнопки
+        btnScanWithCamera.setOnClickListener(v -> openCameraScanner());
+        btnFindRecyclingPoints.setOnClickListener(v -> openMap());
     }
 
     private void checkPermissionAndPickImage() {
@@ -157,10 +163,20 @@ public class MainActivity extends AppCompatActivity {
         imagePickerLauncher.launch(intent);
     }
 
-    // Новый метод для запуска активности сканера
+    // Метод для запуска активности сканера
     private void openCameraScanner() {
         Intent intent = new Intent(this, CameraActivity.class);
         cameraLauncher.launch(intent);
+    }
+
+    // Новый метод для открытия карты с пунктами приема
+    private void openMap() {
+        Intent intent = new Intent(this, MapActivity.class);
+        // Передаем тип отхода, чтобы сразу показать нужные пункты приема
+        if (currentWasteType != null && !currentWasteType.isEmpty()) {
+            intent.putExtra("waste_type", currentWasteType);
+        }
+        startActivity(intent);
     }
 
     private void displayImage(Bitmap bitmap) {
@@ -213,11 +229,13 @@ public class MainActivity extends AppCompatActivity {
     private void showLoading(boolean isLoading) {
         tvLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
         btnSelectImage.setEnabled(!isLoading);
-        btnScanWithCamera.setEnabled(!isLoading); // Добавлено отключение кнопки сканера во время загрузки
+        btnScanWithCamera.setEnabled(!isLoading);
+        btnFindRecyclingPoints.setEnabled(!isLoading);
     }
 
     private void hideResult() {
         cardResult.setVisibility(View.GONE);
+        btnFindRecyclingPoints.setVisibility(View.GONE);
     }
 
     private void displayResult(GarbageInfo garbageInfo) {
@@ -225,5 +243,11 @@ public class MainActivity extends AppCompatActivity {
         tvInstructions.setText("Инструкция по подготовке: " + garbageInfo.getInstructions());
         tvEstimatedCost.setText("Оценочная стоимость: " + garbageInfo.getEstimatedCost());
         cardResult.setVisibility(View.VISIBLE);
+
+        // Показываем кнопку поиска пунктов приема
+        btnFindRecyclingPoints.setVisibility(View.VISIBLE);
+
+        // Сохраняем текущий тип отхода для передачи в MapActivity
+        currentWasteType = garbageInfo.getType();
     }
 }
