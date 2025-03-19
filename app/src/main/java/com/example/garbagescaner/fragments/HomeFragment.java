@@ -186,7 +186,7 @@ public class HomeFragment extends Fragment {
             tvStreakStatus.setText("Выполнено!");
             tvStreakStatus.setBackgroundResource(R.drawable.pill_background);
         } else {
-            tvStreakStatus.setText("Утилизируйте сегодня!");
+            tvStreakStatus.setText("Сканировать!");
             tvStreakStatus.setBackgroundResource(R.drawable.pill_background);
         }
 

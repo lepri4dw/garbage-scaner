@@ -114,7 +114,7 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Эко-ударный режим"
+                        android:text="Эко-Streak"
                         android:textStyle="bold"
                         android:textSize="18sp"
                         android:textColor="#FFFFFF" />
@@ -132,7 +132,7 @@
                     android:id="@+id/tvStreakStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Начните сегодня!"
+                    android:text="Начни!"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:textColor="#FFFFFF"

@@ -19,6 +19,8 @@ public class NotRecycledDetailsDialog {
     private final Dialog dialog;
     private final Context context;
     private final OnRecycleClickListener listener;
+    private ImageView mapButton;
+
 
     public interface OnRecycleClickListener {
         void onRecycleClick(ScanResult scanResult, int position);
@@ -41,6 +43,8 @@ public class NotRecycledDetailsDialog {
         TextView tvDetailCost = dialog.findViewById(R.id.tvDetailCost);
         ImageView ivDetailImage = dialog.findViewById(R.id.ivDetailImage);
         Button btnDialogRecycle = dialog.findViewById(R.id.btnDialogRecycle);
+        mapButton = dialog.findViewById(R.id.ivMapIcon);
+
 
         // Заполняем данными
         tvDetailType.setText("Тип отхода: " + scanResult.getWasteType());
@@ -54,6 +58,13 @@ public class NotRecycledDetailsDialog {
                     .into(ivDetailImage);
         }
 
+        // Настраиваем кнопку карты
+        mapButton.setOnClickListener(v -> {
+            Intent intent = new Intent(context, MapActivity.class);
+            intent.putExtra("waste_type", scanResult.getWasteType());
+            context.startActivity(intent);
+            dialog.dismiss();
+        });
 
 
 

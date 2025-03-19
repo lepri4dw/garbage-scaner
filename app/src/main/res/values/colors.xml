@@ -20,4 +20,10 @@
     <color name="background">#F5F5F5</color>
     <color name="card_background">#FFFFFF</color>
     <color name="divider">#E0E0E0</color>
+
+    <color name="green_primary_dark">#388E3C</color>
+    <color name="green_dark_dark">#1B5E20</color>
+    <color name="card_background_dark">#121212</color>
+    <color name="text_primary_dark">#E0E0E0</color>
+    <color name="text_secondary_dark">#B0B0B0</color>
 </resources>
