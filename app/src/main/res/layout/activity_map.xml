@@ -20,5 +20,20 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1" />
+    <!-- Добавьте эту кнопку в ваш макет activity_map.xml -->
+    <!-- В зависимости от вашей текущей разметки, может потребоваться скорректировать родительский контейнер -->
+
+    <Button
+        android:id="@+id/openIn2GisButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Открыть в 2ГИС"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:padding="12dp"
+        android:backgroundTint="@color/black"
+        android:textColor="#FFFFFF" />
 
 </LinearLayout>
