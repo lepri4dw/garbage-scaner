@@ -12,13 +12,24 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <ImageView
-            android:id="@+id/ivTipImage"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="120dp"
-            android:scaleType="centerCrop"
-            android:contentDescription="Изображение эко-совета"
-            android:src="@drawable/ic_eco" />
+            android:layout_height="120dp">
+
+            <ImageView
+                android:id="@+id/ivTipImage"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:contentDescription="Изображение эко-совета"
+                android:src="@drawable/ic_eco" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_gravity="bottom"
+                android:background="@drawable/tip_gradient_overlay" />
+        </FrameLayout>
 
         <TextView
             android:id="@+id/tvTipTitle"
