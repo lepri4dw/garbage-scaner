@@ -3,6 +3,7 @@ package com.example.garbagescaner.fragments;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,14 +14,17 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.garbagescaner.R;
 import com.example.garbagescaner.adapters.EcoTipsAdapter;
+import com.example.garbagescaner.database.ScanHistoryManager;
 import com.example.garbagescaner.database.StreakManager;
+import com.example.garbagescaner.database.ScanHistoryManager;
+import com.example.garbagescaner.database.AchievementManager;
 import com.example.garbagescaner.models.EcoTip;
+import com.example.garbagescaner.models.StatisticPeriod;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,11 +32,16 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 public class HomeFragment extends Fragment {
+    private static final String TAG = "HomeFragment";
 
     private TextView tvEcoFact;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Random random = new Random();
     private RecyclerView recyclerViewTips;
+
+    // Добавлены менеджеры
+    private ScanHistoryManager historyManager;
+    private AchievementManager achievementManager;
 
     @Nullable
     @Override
@@ -43,6 +52,10 @@ public class HomeFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+
+        // Инициализация менеджеров
+        historyManager = new ScanHistoryManager(requireContext());
+        achievementManager = new AchievementManager(requireContext());
 
         // Инициализация компонентов
         tvEcoFact = view.findViewById(R.id.tv_eco_fact);
@@ -60,7 +73,21 @@ public class HomeFragment extends Fragment {
         // Загружаем эко-советы
         setupEcoTips();
 
+        // Получаем и отображаем статистику
+        TextView tvTotalCount = view.findViewById(R.id.tvTotalCount);
+        TextView tvAchievementsCount = view.findViewById(R.id.tvAchievementsCount);
 
+        try {
+            // Количество утилизаций
+            int totalRecycled = historyManager.getTotalRecycledCount(StatisticPeriod.ALL_TIME);
+            tvTotalCount.setText(String.valueOf(totalRecycled));
+
+            // Количество достижений
+            int achievementsCount = achievementManager.getUnlockedAchievements().size();
+            tvAchievementsCount.setText(String.valueOf(achievementsCount));
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating stats: " + e.getMessage());
+        }
     }
 
     @Override
