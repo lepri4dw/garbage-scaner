@@ -9,10 +9,14 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -47,6 +51,7 @@ import java.util.List;
 public class ScannerFragment extends Fragment {
 
     private static final String GEMINI_API_KEY = "AIzaSyCl8qzbbpDJ-ltNr_86SSFMTnbC6vhXvCk";
+    private static final String TAG = "ScannerFragment";
 
     private ImageView imageView;
     private Button btnSelectImage;
@@ -57,13 +62,14 @@ public class ScannerFragment extends Fragment {
     private TextView tvGarbageType;
     private TextView tvInstructions;
     private TextView tvEstimatedCost;
+    private ProgressBar progressBar;
+    private TextView tvPlaceholder;
 
     private VisionApiClient visionApiClient;
     private GeminiApiClient geminiApiClient;
     private ScanHistoryManager historyManager;
 
     private boolean isProcessing = false;
-
 
     private ActivityResultLauncher<Intent> imagePickerLauncher;
     private ActivityResultLauncher<Intent> cameraLauncher;
@@ -88,10 +94,12 @@ public class ScannerFragment extends Fragment {
         setupLaunchers();
         setupListeners();
 
+        setupButtonAnimations();
+
         // Инициализируем менеджер истории сканирований
         historyManager = new ScanHistoryManager(requireContext());
 
-        // В методе onViewCreated в ScannerFragment добавьте обработчик нажатия кнопки "Назад"
+        // Обработчик нажатия кнопки "Назад"
         requireActivity().getOnBackPressedDispatcher().addCallback(getViewLifecycleOwner(),
                 new OnBackPressedCallback(true) {
                     @Override
@@ -126,6 +134,33 @@ public class ScannerFragment extends Fragment {
                 });
     }
 
+    private void setupButtonAnimations() {
+        // Загружаем анимацию пульсации
+        Animation pulseAnimation = AnimationUtils.loadAnimation(requireContext(), R.anim.pulse_scale);
+
+        // Добавляем слушатели касания для анимации кнопок
+        btnSelectImage.setOnTouchListener((v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                v.startAnimation(pulseAnimation);
+            }
+            return false;
+        });
+
+        btnScanWithCamera.setOnTouchListener((v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                v.startAnimation(pulseAnimation);
+            }
+            return false;
+        });
+
+        btnFindRecyclingPoints.setOnTouchListener((v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                v.startAnimation(pulseAnimation);
+            }
+            return false;
+        });
+    }
+
     private void initializeViews(View view) {
         imageView = view.findViewById(R.id.imageView);
         btnSelectImage = view.findViewById(R.id.btnSelectImage);
@@ -136,6 +171,8 @@ public class ScannerFragment extends Fragment {
         tvGarbageType = view.findViewById(R.id.tvGarbageType);
         tvInstructions = view.findViewById(R.id.tvInstructions);
         tvEstimatedCost = view.findViewById(R.id.tvEstimatedCost);
+        progressBar = view.findViewById(R.id.progressBar);
+        tvPlaceholder = view.findViewById(R.id.tvPlaceholder);
     }
 
     private void initializeClients() {
@@ -242,6 +279,7 @@ public class ScannerFragment extends Fragment {
     }
 
     private void displayImage(Bitmap bitmap) {
+        tvPlaceholder.setVisibility(View.GONE);
         Glide.with(this).load(bitmap).into(imageView);
     }
 
@@ -272,7 +310,6 @@ public class ScannerFragment extends Fragment {
                 getActivity().runOnUiThread(() -> {
                     showLoading(false);
                     isProcessing = false;
-
 
                     if (getActivity() instanceof MainActivity) {
                         ((MainActivity) getActivity()).setNavigationEnabled(true);
@@ -321,7 +358,6 @@ public class ScannerFragment extends Fragment {
         });
     }
 
-
     private void saveScanToHistory() {
         // Создаем объект результата сканирования
         ScanResult scanResult = new ScanResult(
@@ -337,6 +373,15 @@ public class ScannerFragment extends Fragment {
     }
 
     private void showLoading(boolean isLoading) {
+        Animation fadeAnimation = AnimationUtils.loadAnimation(requireContext(), R.anim.fade_in_out);
+
+        if (isLoading) {
+            progressBar.startAnimation(fadeAnimation);
+            tvLoading.startAnimation(fadeAnimation);
+            tvPlaceholder.setVisibility(View.GONE);
+        }
+
+        progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
         tvLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
         btnSelectImage.setEnabled(!isLoading);
         btnScanWithCamera.setEnabled(!isLoading);
@@ -350,12 +395,18 @@ public class ScannerFragment extends Fragment {
 
     private void displayResult(GarbageInfo garbageInfo) {
         tvGarbageType.setText("Тип отхода: " + garbageInfo.getType());
-        tvInstructions.setText("Инструкция по подготовке: " + garbageInfo.getInstructions());
+        tvInstructions.setText("Инструкция: " + garbageInfo.getInstructions());
         tvEstimatedCost.setText("Оценочная стоимость: " + garbageInfo.getEstimatedCost());
-        cardResult.setVisibility(View.VISIBLE);
 
-        // Показываем кнопку поиска пунктов приема
+        // Анимация появления результатов
+        Animation slideUpAnimation = AnimationUtils.loadAnimation(requireContext(), R.anim.slide_up);
+
+        cardResult.setVisibility(View.VISIBLE);
+        cardResult.startAnimation(slideUpAnimation);
+
+        // Показываем кнопку поиска пунктов приема с анимацией
         btnFindRecyclingPoints.setVisibility(View.VISIBLE);
+        btnFindRecyclingPoints.startAnimation(slideUpAnimation);
 
         // Сохраняем текущий тип отхода для передачи в MapActivity
         currentWasteType = garbageInfo.getType();
