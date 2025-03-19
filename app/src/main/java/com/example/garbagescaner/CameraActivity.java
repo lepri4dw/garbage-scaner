@@ -8,6 +8,8 @@ import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -40,7 +42,18 @@ public class CameraActivity extends AppCompatActivity {
     private PreviewView viewFinder;
     private ProgressBar progressBar;
     private TextView statusText;
+    private FloatingActionButton captureButton;
     private final Executor executor = Executors.newSingleThreadExecutor();
+
+    private View scanLine;
+    private View scanFrame;
+    private Animation scanAnimation;
+
+    private void startScanAnimation() {
+        if (scanLine != null && scanAnimation != null) {
+            scanLine.startAnimation(scanAnimation);
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,9 +63,18 @@ public class CameraActivity extends AppCompatActivity {
         try {
             // Инициализация UI компонентов
             viewFinder = findViewById(R.id.viewFinder);
-            FloatingActionButton captureButton = findViewById(R.id.capture_button);
+            captureButton = findViewById(R.id.capture_button);
             progressBar = findViewById(R.id.progressBar);
             statusText = findViewById(R.id.status_text);
+
+            // Инициализация сканирующей линии и анимации
+            scanLine = findViewById(R.id.scanLine);
+            scanFrame = findViewById(R.id.scanFrame);
+            scanAnimation = AnimationUtils.loadAnimation(this, R.anim.scan_line_animation);
+
+            // Применяем пульсацию к кнопке
+            Animation pulseButtonAnimation = AnimationUtils.loadAnimation(this, R.anim.pulse_capture_button);
+            captureButton.startAnimation(pulseButtonAnimation);
 
             // Проверка разрешений
             if (allPermissionsGranted()) {
@@ -63,6 +85,9 @@ public class CameraActivity extends AppCompatActivity {
 
             // Настройка кнопки захвата
             captureButton.setOnClickListener(v -> takePhoto());
+
+            // Запускаем анимацию сканирования
+            startScanAnimation();
 
         } catch (Exception e) {
             Log.e(TAG, "Ошибка при инициализации: ", e);
@@ -125,6 +150,12 @@ public class CameraActivity extends AppCompatActivity {
         }
 
         try {
+            // Останавливаем анимацию сканирования
+            if (scanLine != null) {
+                scanLine.clearAnimation();
+                scanLine.setVisibility(View.INVISIBLE);
+            }
+
             // Показываем прогресс
             if (progressBar != null) {
                 progressBar.setVisibility(View.VISIBLE);
@@ -194,6 +225,13 @@ public class CameraActivity extends AppCompatActivity {
                             if (progressBar != null) {
                                 progressBar.setVisibility(View.GONE);
                             }
+
+                            // Перезапускаем анимацию в случае ошибки
+                            if (scanLine != null) {
+                                scanLine.setVisibility(View.VISIBLE);
+                                startScanAnimation();
+                            }
+
                             Log.e(TAG, "Ошибка при сохранении фото: ", exception);
                             Toast.makeText(CameraActivity.this,
                                     "Ошибка при съемке фото: " + exception.getMessage(), Toast.LENGTH_SHORT).show();
@@ -207,6 +245,13 @@ public class CameraActivity extends AppCompatActivity {
             if (progressBar != null) {
                 progressBar.setVisibility(View.GONE);
             }
+
+            // Перезапускаем анимацию в случае ошибки
+            if (scanLine != null) {
+                scanLine.setVisibility(View.VISIBLE);
+                startScanAnimation();
+            }
+
             Toast.makeText(this, "Ошибка при съемке фото: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }

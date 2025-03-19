@@ -1,7 +1,19 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.GarbageScaner" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+
+    <!-- Base application theme for Dark Mode -->
+    <style name="Base.Theme.GarbageScaner.Dark" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Dark theme customizations -->
+        <item name="colorPrimary">@color/green_primary_dark</item>
+        <item name="colorPrimaryDark">@color/green_dark_dark</item>
+        <item name="colorAccent">@color/accent_dark</item>
+        <item name="android:windowBackground">@color/card_background_dark</item>
+        <item name="android:textColorPrimary">@color/text_primary_dark</item>
+        <item name="android:textColorSecondary">@color/text_secondary_dark</item>
     </style>
+
+    <!-- Applying the light theme by default, but it will switch based on user preferences -->
+    <style name="Theme.GarbageScaner" parent="Base.Theme.GarbageScaner" />
+
+    <!-- Applying the dark theme variant -->
+    <style name="Theme.GarbageScaner.Dark" parent="Base.Theme.GarbageScaner.Dark" />
 </resources>

@@ -10,6 +10,28 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- Добавляем рамку для сканирования -->
+    <View
+        android:id="@+id/scanFrame"
+        android:layout_width="280dp"
+        android:layout_height="280dp"
+        android:background="@drawable/scan_frame"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.4" />
+
+    <!-- Добавляем сканирующую линию -->
+    <View
+        android:id="@+id/scanLine"
+        android:layout_width="0dp"
+        android:layout_height="2dp"
+        android:background="@drawable/scan_line"
+        app:layout_constraintEnd_toEndOf="@id/scanFrame"
+        app:layout_constraintStart_toStartOf="@id/scanFrame"
+        app:layout_constraintTop_toTopOf="@id/scanFrame" />
+
     <TextView
         android:id="@+id/status_text"
         android:layout_width="wrap_content"

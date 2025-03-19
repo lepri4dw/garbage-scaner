@@ -1,8 +1,10 @@
 package com.example.garbagescaner.fragments;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,14 +15,18 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.garbagescaner.R;
 import com.example.garbagescaner.adapters.EcoTipsAdapter;
+import com.example.garbagescaner.database.ScanHistoryManager;
 import com.example.garbagescaner.database.StreakManager;
+import com.example.garbagescaner.database.AchievementManager;
+import com.example.garbagescaner.maps.MapActivity;
 import com.example.garbagescaner.models.EcoTip;
+import com.example.garbagescaner.models.StatisticPeriod;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,11 +34,16 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 public class HomeFragment extends Fragment {
+    private static final String TAG = "HomeFragment";
 
     private TextView tvEcoFact;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Random random = new Random();
     private RecyclerView recyclerViewTips;
+
+    // Добавлены менеджеры
+    private ScanHistoryManager historyManager;
+    private AchievementManager achievementManager;
 
     @Nullable
     @Override
@@ -60,7 +71,48 @@ public class HomeFragment extends Fragment {
         // Загружаем эко-советы
         setupEcoTips();
 
+        // Настраиваем кнопки быстрых действий
+        setupActionButtons(view);
 
+        updateStatisticsCounters(view);
+    }
+
+    private void updateStatisticsCounters(View view) {
+        TextView tvTotalCount = view.findViewById(R.id.tvTotalCount);
+        TextView tvAchievementsCount = view.findViewById(R.id.tvAchievementsCount);
+
+        // Получаем менеджеры для получения данных
+        ScanHistoryManager historyManager = new ScanHistoryManager(requireContext());
+        AchievementManager achievementManager = new AchievementManager(requireContext());
+
+        // Устанавливаем значения счетчиков
+        int totalRecycled = historyManager.getTotalRecycledCount(StatisticPeriod.ALL_TIME);
+        int achievementsCount = achievementManager.getUnlockedAchievements().size();
+
+        tvTotalCount.setText(String.valueOf(totalRecycled));
+        tvAchievementsCount.setText(String.valueOf(achievementsCount));
+    }
+
+    private void setupActionButtons(View view) {
+        View actionScan = view.findViewById(R.id.actionScan);
+        View actionMap = view.findViewById(R.id.actionMap);
+
+        // Обработчик для кнопки сканирования
+        actionScan.setOnClickListener(v -> {
+            if (getActivity() != null) {
+                // Переключаемся на вкладку сканера
+                BottomNavigationView bottomNavigationView = getActivity().findViewById(R.id.bottom_navigation);
+                bottomNavigationView.setSelectedItemId(R.id.navigation_scanner);
+            }
+        });
+
+        // Обработчик для кнопки карты пунктов приема
+        actionMap.setOnClickListener(v -> {
+            if (getActivity() != null) {
+                Intent intent = new Intent(getActivity(), MapActivity.class);
+                startActivity(intent);
+            }
+        });
     }
 
     @Override
@@ -73,6 +125,10 @@ public class HomeFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+
+        if (getView() != null) {
+            updateStatisticsCounters(getView());
+        }
 
         // Обновляем факт
         showRandomFact();
@@ -130,7 +186,7 @@ public class HomeFragment extends Fragment {
             tvStreakStatus.setText("Выполнено!");
             tvStreakStatus.setBackgroundResource(R.drawable.pill_background);
         } else {
-            tvStreakStatus.setText("Утилизируйте сегодня!");
+            tvStreakStatus.setText("Сканировать!");
             tvStreakStatus.setBackgroundResource(R.drawable.pill_background);
         }
 
