@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">GarbageScaner</string>
+    <string name="app_name">Waste Scanner</string>
     <string name="title_home">Главная</string>
     <string name="title_scanner">Сканер</string>
     <string name="title_profile">Профиль</string>
