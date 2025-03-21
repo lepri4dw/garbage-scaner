@@ -5,9 +5,12 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.AudioAttributes;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -28,6 +31,18 @@ import androidx.annotation.Nullable;
 import androidx.cardview.widget.CardView;
 import androidx.fragment.app.Fragment;
 
+import com.google.api.gax.core.FixedCredentialsProvider;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.texttospeech.v1.AudioConfig;
+import com.google.cloud.texttospeech.v1.AudioEncoding;
+import com.google.cloud.texttospeech.v1.SsmlVoiceGender;
+import com.google.cloud.texttospeech.v1.SynthesisInput;
+import com.google.cloud.texttospeech.v1.SynthesizeSpeechResponse;
+import com.google.cloud.texttospeech.v1.TextToSpeechClient;
+import com.google.cloud.texttospeech.v1.TextToSpeechSettings;
+import com.google.cloud.texttospeech.v1.VoiceSelectionParams;
+import com.google.protobuf.ByteString;
+
 import com.bumptech.glide.Glide;
 import com.example.garbagescaner.CameraActivity;
 import com.example.garbagescaner.MainActivity;
@@ -45,8 +60,14 @@ import com.karumi.dexter.listener.PermissionGrantedResponse;
 import com.karumi.dexter.listener.PermissionRequest;
 import com.karumi.dexter.listener.single.PermissionListener;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class ScannerFragment extends Fragment {
 
@@ -68,6 +89,13 @@ public class ScannerFragment extends Fragment {
     private VisionApiClient visionApiClient;
     private GeminiApiClient geminiApiClient;
     private ScanHistoryManager historyManager;
+
+    // TTS компоненты
+    private Button btnReadResult;
+    private MediaPlayer mediaPlayer;
+    private ExecutorService ttsExecutor;
+    private boolean isTtsProcessing = false;
+    private File cacheDir;
 
     private boolean isProcessing = false;
 
@@ -93,11 +121,16 @@ public class ScannerFragment extends Fragment {
         initializeClients();
         setupLaunchers();
         setupListeners();
-
         setupButtonAnimations();
 
         // Инициализируем менеджер истории сканирований
         historyManager = new ScanHistoryManager(requireContext());
+
+        // Инициализируем executor для TTS
+        ttsExecutor = Executors.newSingleThreadExecutor();
+
+        // Инициализируем директорию кэша
+        cacheDir = requireContext().getCacheDir();
 
         // Обработчик нажатия кнопки "Назад"
         requireActivity().getOnBackPressedDispatcher().addCallback(getViewLifecycleOwner(),
@@ -159,6 +192,16 @@ public class ScannerFragment extends Fragment {
             }
             return false;
         });
+
+        // Анимация для кнопки чтения
+        if (btnReadResult != null) {
+            btnReadResult.setOnTouchListener((v, event) -> {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    v.startAnimation(pulseAnimation);
+                }
+                return false;
+            });
+        }
     }
 
     private void initializeViews(View view) {
@@ -173,6 +216,38 @@ public class ScannerFragment extends Fragment {
         tvEstimatedCost = view.findViewById(R.id.tvEstimatedCost);
         progressBar = view.findViewById(R.id.progressBar);
         tvPlaceholder = view.findViewById(R.id.tvPlaceholder);
+
+        // Ищем кнопку чтения в макете
+        btnReadResult = view.findViewById(R.id.btnReadResult);
+        if (btnReadResult == null) {
+            // Если кнопка отсутствует в макете, добавим ее программно
+            btnReadResult = new Button(requireContext());
+            btnReadResult.setId(View.generateViewId());
+            btnReadResult.setText("Прочитать результат");
+
+            // Проверяем наличие ресурса иконки
+            try {
+                requireContext().getResources().getDrawable(R.drawable.ic_speaker, null);
+                btnReadResult.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_speaker, 0, 0, 0);
+                btnReadResult.setCompoundDrawablePadding(8);
+            } catch (Exception e) {
+                Log.w(TAG, "Иконка динамика не найдена: " + e.getMessage());
+            }
+
+            // Добавляем кнопку после cardResult
+            ViewGroup parent = (ViewGroup) cardResult.getParent();
+            int index = parent.indexOfChild(cardResult);
+            ViewGroup.MarginLayoutParams params = new ViewGroup.MarginLayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+            params.setMargins(32, 16, 32, 16);
+
+            // Добавляем кнопку в родительский ViewGroup
+            parent.addView(btnReadResult, index + 1, params);
+        }
+
+        // Изначально скрываем кнопку
+        btnReadResult.setVisibility(View.GONE);
     }
 
     private void initializeClients() {
@@ -226,6 +301,13 @@ public class ScannerFragment extends Fragment {
         btnSelectImage.setOnClickListener(v -> checkPermissionAndPickImage());
         btnScanWithCamera.setOnClickListener(v -> openCameraScanner());
         btnFindRecyclingPoints.setOnClickListener(v -> openMap());
+
+        // Слушатель для кнопки чтения
+        btnReadResult.setOnClickListener(v -> {
+            if (currentWasteType != null) {
+                speakFullGarbageInfo(); // Изменено на метод для полного озвучивания
+            }
+        });
     }
 
     private void checkPermissionAndPickImage() {
@@ -352,6 +434,12 @@ public class ScannerFragment extends Fragment {
 
                 getActivity().runOnUiThread(() -> {
                     showLoading(false);
+                    isProcessing = false;
+
+                    if (getActivity() instanceof MainActivity) {
+                        ((MainActivity) getActivity()).setNavigationEnabled(true);
+                    }
+
                     Toast.makeText(requireContext(), "Ошибка получения информации: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
             }
@@ -391,6 +479,7 @@ public class ScannerFragment extends Fragment {
     private void hideResult() {
         cardResult.setVisibility(View.GONE);
         btnFindRecyclingPoints.setVisibility(View.GONE);
+        btnReadResult.setVisibility(View.GONE);
     }
 
     private void displayResult(GarbageInfo garbageInfo) {
@@ -408,7 +497,372 @@ public class ScannerFragment extends Fragment {
         btnFindRecyclingPoints.setVisibility(View.VISIBLE);
         btnFindRecyclingPoints.startAnimation(slideUpAnimation);
 
+        // Показываем кнопку чтения результата
+        btnReadResult.setVisibility(View.VISIBLE);
+        btnReadResult.startAnimation(slideUpAnimation);
+
         // Сохраняем текущий тип отхода для передачи в MapActivity
         currentWasteType = garbageInfo.getType();
+
+        // Автоматически озвучиваем только тип отхода при первом сканировании
+        speakGarbageInfo();
+    }
+
+    /**
+     * Преобразует тип отхода в текст для озвучивания с правильным склонением
+     */
+    private String getTextForSpeech() {
+        if (currentWasteType == null || currentWasteType.isEmpty()) {
+            return "Тип отхода не определен";
+        }
+
+        // Формируем правильное склонение в зависимости от типа отхода
+        String result = "Определен тип отхода: ";
+
+        switch (currentWasteType.toLowerCase()) {
+            case "пластик":
+                result += "пластик";
+                break;
+            case "стекло":
+                result += "стекло";
+                break;
+            case "бумага":
+                result += "бумага";
+                break;
+            case "металл":
+                result += "металл";
+                break;
+            case "электроника":
+                result += "электроника";
+                break;
+            case "пищевые отходы":
+                result += "пищевые отходы";
+                break;
+            default:
+                result += currentWasteType;
+                break;
+        }
+
+        return result;
+    }
+
+    /**
+     * Формирует полный текст для озвучивания всей информации о отходе
+     */
+    private String getFullTextForSpeech() {
+        if (currentWasteType == null || currentWasteType.isEmpty()) {
+            return "Тип отхода не определен";
+        }
+
+        StringBuilder result = new StringBuilder();
+
+        // Добавляем тип отхода
+        result.append("Определен тип отхода: ").append(currentWasteType).append(". ");
+
+        // Добавляем инструкцию, если она есть
+        if (currentInstructions != null && !currentInstructions.isEmpty()) {
+            result.append("Инструкция по подготовке: ").append(currentInstructions).append(". ");
+        }
+
+        // Добавляем стоимость, если она есть
+        if (currentEstimatedCost != null && !currentEstimatedCost.isEmpty()) {
+            result.append("Оценочная стоимость: ").append(currentEstimatedCost).append(".");
+        }
+
+        return result.toString();
+    }
+
+    /**
+     * Озвучивает только тип отхода (для автоматического озвучивания при первом сканировании)
+     */
+    private void speakGarbageInfo() {
+        // Проверяем, не идет ли уже процесс синтеза речи
+        if (isTtsProcessing) {
+            Log.d(TAG, "Синтез речи уже выполняется, возвращаемся");
+            return;
+        }
+
+        // Проверяем, не воспроизводится ли уже аудио
+        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+            Log.d(TAG, "Аудио уже воспроизводится, останавливаем");
+            mediaPlayer.stop();
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
+
+        // Создаем имя файла, зависящее от типа отхода
+        String safeWasteType = currentWasteType.replace(" ", "_").toLowerCase();
+        File wasteTypeFile = new File(cacheDir, "tts_type_" + safeWasteType + ".mp3");
+
+        // Проверяем, существует ли уже файл для этого типа отхода
+        if (wasteTypeFile.exists() && wasteTypeFile.length() > 0) {
+            // Если файл уже есть для текущего типа отхода, используем его
+            Log.d(TAG, "Найден существующий аудиофайл для типа " + currentWasteType);
+            playAudio(wasteTypeFile);
+            return;
+        }
+
+        // Отображаем прогресс
+        Toast.makeText(requireContext(), "Подготовка голосового сообщения...", Toast.LENGTH_SHORT).show();
+
+        isTtsProcessing = true;
+        final String textToSpeak = getTextForSpeech();
+
+        // Запускаем в отдельном потоке
+        ttsExecutor.execute(() -> {
+            try {
+                Log.d(TAG, "Начинаем синтез речи для текста: " + textToSpeak);
+
+                // Загружаем учетные данные Google Cloud
+                InputStream credentialsStream = requireContext().getAssets().open("garbagescaner-454017-827fa0fdc541.json");
+                GoogleCredentials credentials = GoogleCredentials.fromStream(credentialsStream);
+                credentialsStream.close();
+
+                // Настраиваем клиент Text-to-Speech
+                TextToSpeechSettings settings = TextToSpeechSettings.newBuilder()
+                        .setCredentialsProvider(FixedCredentialsProvider.create(credentials))
+                        .build();
+
+                // Подготавливаем параметры запроса
+                try (TextToSpeechClient textToSpeechClient = TextToSpeechClient.create(settings)) {
+                    SynthesisInput input = SynthesisInput.newBuilder()
+                            .setText(textToSpeak)
+                            .build();
+
+                    // Настраиваем голос (русский, мужской, Chirp3-HD-Charon)
+                    VoiceSelectionParams voice = VoiceSelectionParams.newBuilder()
+                            .setLanguageCode("ru-RU")
+                            .setName("ru-RU-Chirp3-HD-Charon")
+                            .build();
+
+                    // Настраиваем аудио (MP3)
+                    AudioConfig audioConfig = AudioConfig.newBuilder()
+                            .setAudioEncoding(AudioEncoding.MP3)
+                            .setSpeakingRate(0.9) // Немного замедляем речь для лучшего восприятия
+                            .setPitch(0.0) // Нормальная высота голоса
+                            .build();
+
+                    // Синтезируем речь
+                    Log.d(TAG, "Отправляем запрос на Google Cloud TTS");
+                    SynthesizeSpeechResponse response = textToSpeechClient.synthesizeSpeech(input, voice, audioConfig);
+                    ByteString audioContents = response.getAudioContent();
+
+                    // Сохраняем аудио в файл для текущего типа отхода
+                    Log.d(TAG, "Сохраняем аудио в файл: " + wasteTypeFile.getAbsolutePath());
+                    try (OutputStream out = new FileOutputStream(wasteTypeFile)) {
+                        out.write(audioContents.toByteArray());
+                    }
+
+                    // Воспроизводим аудио на главном потоке
+                    if (getActivity() != null) {
+                        requireActivity().runOnUiThread(() -> {
+                            playAudio(wasteTypeFile);
+                            isTtsProcessing = false;
+                        });
+                    } else {
+                        isTtsProcessing = false;
+                    }
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "Ошибка синтеза речи: " + e.getMessage(), e);
+                if (getActivity() != null) {
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(requireContext(), "Ошибка голосового вывода: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        isTtsProcessing = false;
+                    });
+                } else {
+                    isTtsProcessing = false;
+                }
+            }
+        });
+    }
+
+    /**
+     * Озвучивает полную информацию о отходе (тип, инструкцию, стоимость)
+     * Вызывается при нажатии на кнопку "Прочитать результат"
+     */
+    private void speakFullGarbageInfo() {
+        // Проверяем, не идет ли уже процесс синтеза речи
+        if (isTtsProcessing) {
+            Log.d(TAG, "Синтез речи уже выполняется, возвращаемся");
+            return;
+        }
+
+        // Проверяем, не воспроизводится ли уже аудио
+        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+            Log.d(TAG, "Аудио уже воспроизводится, останавливаем");
+            mediaPlayer.stop();
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
+
+        // Создаем имя файла, зависящее от типа отхода и содержащее хеш текста
+        String safeWasteType = currentWasteType.replace(" ", "_").toLowerCase();
+        String fullText = getFullTextForSpeech();
+        int textHash = fullText.hashCode();
+        File fullInfoFile = new File(cacheDir, "tts_full_" + safeWasteType + "_" + textHash + ".mp3");
+
+        // Проверяем, существует ли уже файл для полной информации
+        if (fullInfoFile.exists() && fullInfoFile.length() > 0) {
+            // Если файл уже есть, используем его
+            Log.d(TAG, "Найден существующий аудиофайл для полной информации о " + currentWasteType);
+            playAudio(fullInfoFile);
+            return;
+        }
+
+        // Отображаем прогресс
+        Toast.makeText(requireContext(), "Подготовка полного голосового описания...", Toast.LENGTH_SHORT).show();
+
+        isTtsProcessing = true;
+
+        // Запускаем в отдельном потоке
+        ttsExecutor.execute(() -> {
+            try {
+                Log.d(TAG, "Начинаем синтез речи для полного текста: " + fullText);
+
+                // Загружаем учетные данные Google Cloud
+                InputStream credentialsStream = requireContext().getAssets().open("garbagescaner-454017-827fa0fdc541.json");
+                GoogleCredentials credentials = GoogleCredentials.fromStream(credentialsStream);
+                credentialsStream.close();
+
+                // Настраиваем клиент Text-to-Speech
+                TextToSpeechSettings settings = TextToSpeechSettings.newBuilder()
+                        .setCredentialsProvider(FixedCredentialsProvider.create(credentials))
+                        .build();
+
+                // Подготавливаем параметры запроса
+                try (TextToSpeechClient textToSpeechClient = TextToSpeechClient.create(settings)) {
+                    SynthesisInput input = SynthesisInput.newBuilder()
+                            .setText(fullText)
+                            .build();
+
+                    // Настраиваем голос (русский, мужской, Chirp3-HD-Charon)
+                    VoiceSelectionParams voice = VoiceSelectionParams.newBuilder()
+                            .setLanguageCode("ru-RU")
+                            .setName("ru-RU-Chirp3-HD-Charon")
+                            .build();
+
+                    // Настраиваем аудио (MP3)
+                    AudioConfig audioConfig = AudioConfig.newBuilder()
+                            .setAudioEncoding(AudioEncoding.MP3)
+                            .setSpeakingRate(0.9) // Немного замедляем речь для лучшего восприятия
+                            .setPitch(0.0) // Нормальная высота голоса
+                            .build();
+
+                    // Синтезируем речь
+                    Log.d(TAG, "Отправляем запрос на Google Cloud TTS для полного текста");
+                    SynthesizeSpeechResponse response = textToSpeechClient.synthesizeSpeech(input, voice, audioConfig);
+                    ByteString audioContents = response.getAudioContent();
+
+                    // Сохраняем аудио в файл для полной информации
+                    Log.d(TAG, "Сохраняем полное аудио в файл: " + fullInfoFile.getAbsolutePath());
+                    try (OutputStream out = new FileOutputStream(fullInfoFile)) {
+                        out.write(audioContents.toByteArray());
+                    }
+
+                    // Воспроизводим аудио на главном потоке
+                    if (getActivity() != null) {
+                        requireActivity().runOnUiThread(() -> {
+                            playAudio(fullInfoFile);
+                            isTtsProcessing = false;
+                        });
+                    } else {
+                        isTtsProcessing = false;
+                    }
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "Ошибка синтеза речи для полного текста: " + e.getMessage(), e);
+                if (getActivity() != null) {
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(requireContext(), "Ошибка голосового вывода: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        isTtsProcessing = false;
+                    });
+                } else {
+                    isTtsProcessing = false;
+                }
+            }
+        });
+    }
+
+    /**
+     * Воспроизводит аудиофайл с помощью MediaPlayer
+     */
+    private void playAudio(File audioFile) {
+        try {
+            // Освобождаем ресурсы, если медиаплеер уже использовался
+            if (mediaPlayer != null) {
+                mediaPlayer.release();
+                mediaPlayer = null;
+            }
+
+            // Создаем новый медиаплеер
+            mediaPlayer = new MediaPlayer();
+            mediaPlayer.setAudioAttributes(
+                    new AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .build()
+            );
+
+            // Настраиваем источник аудио
+            mediaPlayer.setDataSource(requireContext(), Uri.fromFile(audioFile));
+            mediaPlayer.prepare();
+
+            // Добавляем слушатель завершения для освобождения ресурсов
+            mediaPlayer.setOnCompletionListener(mp -> {
+                // После завершения освобождаем ресурсы
+                mp.release();
+                mediaPlayer = null;
+            });
+
+            // Слушатель ошибок
+            mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+                Log.e(TAG, "Ошибка воспроизведения: " + what + ", " + extra);
+                Toast.makeText(requireContext(), "Ошибка воспроизведения", Toast.LENGTH_SHORT).show();
+                mp.release();
+                mediaPlayer = null;
+                return true;
+            });
+
+            // Запускаем воспроизведение
+            mediaPlayer.start();
+            Log.d(TAG, "Воспроизведение аудио начато");
+        } catch (IOException e) {
+            Log.e(TAG, "Ошибка воспроизведения аудио: " + e.getMessage(), e);
+            Toast.makeText(requireContext(), "Ошибка воспроизведения", Toast.LENGTH_SHORT).show();
+
+            if (mediaPlayer != null) {
+                mediaPlayer.release();
+                mediaPlayer = null;
+            }
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+
+        // Останавливаем воспроизведение при приостановке фрагмента
+        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+            mediaPlayer.stop();
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        // Освобождаем ресурсы медиаплеера при уничтожении фрагмента
+        if (mediaPlayer != null) {
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
+
+        // Завершаем executor
+        if (ttsExecutor != null && !ttsExecutor.isShutdown()) {
+            ttsExecutor.shutdown();
+        }
+
+        super.onDestroy();
     }
 }

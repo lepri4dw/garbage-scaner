@@ -72,7 +72,6 @@ public class CameraActivity extends AppCompatActivity {
             scanFrame = findViewById(R.id.scanFrame);
             scanAnimation = AnimationUtils.loadAnimation(this, R.anim.scan_line_animation);
 
-            // Применяем пульсацию к кнопке
             Animation pulseButtonAnimation = AnimationUtils.loadAnimation(this, R.anim.pulse_capture_button);
             captureButton.startAnimation(pulseButtonAnimation);
 
