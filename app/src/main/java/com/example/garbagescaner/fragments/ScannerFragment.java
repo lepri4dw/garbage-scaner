@@ -508,9 +508,7 @@ public class ScannerFragment extends Fragment {
         speakGarbageInfo();
     }
 
-    /**
-     * Преобразует тип отхода в текст для озвучивания с правильным склонением
-     */
+
     private String getTextForSpeech() {
         if (currentWasteType == null || currentWasteType.isEmpty()) {
             return "Тип отхода не определен";
@@ -632,14 +630,14 @@ public class ScannerFragment extends Fragment {
                     // Настраиваем голос (русский, мужской, Chirp3-HD-Charon)
                     VoiceSelectionParams voice = VoiceSelectionParams.newBuilder()
                             .setLanguageCode("ru-RU")
-                            .setName("ru-RU-Chirp3-HD-Charon")
+                            .setSsmlGender(SsmlVoiceGender.MALE)
                             .build();
 
                     // Настраиваем аудио (MP3)
                     AudioConfig audioConfig = AudioConfig.newBuilder()
                             .setAudioEncoding(AudioEncoding.MP3)
-                            .setSpeakingRate(0.9) // Немного замедляем речь для лучшего восприятия
-                            .setPitch(0.0) // Нормальная высота голоса
+//                            .setSpeakingRate(0.9) // Немного замедляем речь для лучшего восприятия
+//                            .setPitch(0.0) // Нормальная высота голоса
                             .build();
 
                     // Синтезируем речь
@@ -739,14 +737,14 @@ public class ScannerFragment extends Fragment {
                     // Настраиваем голос (русский, мужской, Chirp3-HD-Charon)
                     VoiceSelectionParams voice = VoiceSelectionParams.newBuilder()
                             .setLanguageCode("ru-RU")
-                            .setName("ru-RU-Chirp3-HD-Charon")
+                            .setSsmlGender(SsmlVoiceGender.MALE)
                             .build();
 
                     // Настраиваем аудио (MP3)
                     AudioConfig audioConfig = AudioConfig.newBuilder()
                             .setAudioEncoding(AudioEncoding.MP3)
-                            .setSpeakingRate(0.9) // Немного замедляем речь для лучшего восприятия
-                            .setPitch(0.0) // Нормальная высота голоса
+//                            .setSpeakingRate(0.9) // Немного замедляем речь для лучшего восприятия
+//                            .setPitch(0.0) // Нормальная высота голоса
                             .build();
 
                     // Синтезируем речь
